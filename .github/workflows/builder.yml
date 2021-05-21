@@ -7,7 +7,7 @@ on:
 
 jobs:
   buildAll:
-    name: Build for ${{ matrix.targetPlatform }}
+    name: Build ${{ matrix.targetPlatform }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,13 +33,13 @@ jobs:
           buildName: LootyShooty-${{ matrix.targetPlatform }}
           buildsPath: build
           targetPlatform: Standalone${{ matrix.targetPlatform }}
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v2.2.3
         with:
           name: LootyShooty-${{ matrix.targetPlatform }}
           path: build
   
   buildServer:
-    name: Build Server
+    name: Build Server Linux64
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/cache@v2
         with:
           path: Library
-          key: Library-StandaloneLinux64
+          key: Library-Server-StandaloneLinux64
           restore-keys: Library-
       - uses: game-ci/unity-builder@v2
         env:
@@ -59,7 +59,7 @@ jobs:
           buildName: LootyShooty-Server-Linux64
           buildsPath: build
           targetPlatform: StandaloneLinux64
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v2.2.3
         with:
           name: LootyShooty-Server-Linux64
           path: build
