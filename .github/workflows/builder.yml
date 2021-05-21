@@ -13,9 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         targetPlatform:
-          - StandaloneOSX # Build a macOS standalone (Intel 64-bit).
-          - StandaloneWindows64 # Build a Windows 64-bit standalone.
-          - StandaloneLinux64 # Build a Linux 64-bit standalone.
+          - OSX
+          - Windows64
+          - Linux64
     steps:
       - uses: actions/checkout@v2
         with:
@@ -30,13 +30,13 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
-          buildName: LootyShooty_${{ matrix.targetPlatform }}
-          buildsPath: build/${{ matrix.targetPlatform }}
-          targetPlatform: ${{ matrix.targetPlatform }}
+          buildName: LootyShooty-${{ matrix.targetPlatform }}
+          buildsPath: build
+          targetPlatform: Standalone${{ matrix.targetPlatform }}
       - uses: actions/upload-artifact@v2
         with:
           name: LootyShooty-${{ matrix.targetPlatform }}
-          path: build/${{ matrix.targetPlatform }}
+          path: build
   
   buildServer:
     name: Build Server
@@ -56,10 +56,10 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           customParameters: -EnableHeadlessMode
-          buildName: LootyShooty_Server
-          buildsPath: build/StandaloneLinux64_Server
+          buildName: LootyShooty-Server-Linux64
+          buildsPath: build
           targetPlatform: StandaloneLinux64
       - uses: actions/upload-artifact@v2
         with:
-          name: LootyShooty-StandaloneLinux64_Server
-          path: build/StandaloneLinux64_Server
+          name: LootyShooty-Server-Linux64
+          path: build
