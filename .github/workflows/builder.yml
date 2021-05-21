@@ -55,6 +55,7 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
+          customParameters: -EnableHeadlessMode
           buildName: LootyShooty_Server
           buildsPath: build/StandaloneLinux64_Server
           targetPlatform: StandaloneLinux64
