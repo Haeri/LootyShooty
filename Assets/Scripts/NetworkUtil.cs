@@ -11,11 +11,11 @@ public class NetworkUtil : MonoBehaviour
 
     public void StartClient()
     {
-        NetworkSpawner.getInstance().startupClient(ip.text.Trim(), int.Parse(port.text.Trim()));
+        NetworkSpawner.getInstance().startupClient(ip.text.Trim(), int.Parse(port.text.Trim()), playerName.text.Trim());
     }
     public void StartHost()
     {
-        NetworkSpawner.getInstance().startupHost(ip.text.Trim(), int.Parse(port.text.Trim()));
+        NetworkSpawner.getInstance().startupHost(ip.text.Trim(), int.Parse(port.text.Trim()), playerName.text.Trim());
     }
 
     public void StartServer()

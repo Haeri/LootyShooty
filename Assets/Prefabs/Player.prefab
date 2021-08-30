@@ -2084,6 +2084,7 @@ GameObject:
   - component: {fileID: 4937619767263221164}
   - component: {fileID: 7725846585032129984}
   - component: {fileID: 2593560070392949330}
+  - component: {fileID: 7603243594732068812}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -2202,6 +2203,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f9c12f06fdd54345b92fd611a59d8f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  animmultiplier: 1
   maxSpeed: 5
   maxShiftSpeed: 8
   accelerationTime: 0.1
@@ -2335,6 +2337,22 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &7603243594732068812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4937619767263221167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78d821cb80340134e83e8b5763527650, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerName:
+    m_InternalValue: 
+  ping:
+    m_InternalValue: 0
 --- !u!1 &4937619768197937070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2477,7 +2495,8 @@ MonoBehaviour:
     m_InternalValue: 0
   zoomFov: 60
   adsSpeed: 3
-  sightIndex: 0
+  sightIndex:
+    m_InternalValue: 0
 --- !u!114 &4937619769058388380
 MonoBehaviour:
   m_ObjectHideFlags: 0

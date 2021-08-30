@@ -1706,7 +1706,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6e0b19a4c278c645b30b4618e576206, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerName: {fileID: 0}
+  playerName: {fileID: 686253454}
   ip: {fileID: 959481902}
   port: {fileID: 2052567817}
 --- !u!1 &1408611155

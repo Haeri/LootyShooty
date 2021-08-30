@@ -12,6 +12,7 @@ using UnityEngine.Animations.Rigging;
 
 public class PlayerController : NetworkBehaviour
 {
+    public float animmultiplier;
     [Header("Movement")]
     public float maxSpeed = 5.0f;
     public float maxShiftSpeed = 8;
@@ -105,8 +106,8 @@ public class PlayerController : NetworkBehaviour
     {
         if (OwnerClientId == 0)
         {
-            //DebugGUI.SetGraphProperties("velx", "x", -2, 2, 2, new Color(1, 0, 0), false);
-            //DebugGUI.SetGraphProperties("vely", "y", -2, 2, 2, new Color(0, 1, 0), false);
+            DebugGUI.SetGraphProperties("velx", "x", -2, 2, 2, new Color(1, 0, 0), true);
+            DebugGUI.SetGraphProperties("vely", "y", -2, 2, 2, new Color(0, 1, 0), true);
         }
 
         if (IsServer)
@@ -256,18 +257,22 @@ public class PlayerController : NetworkBehaviour
         if (_shouldJump) _shouldJump = false;
 
         itemPickupCheck();
+        performAnimation();
+
+
+        DebugGUI.Graph("velx", _animator.GetFloat("VelocityX"));
+        DebugGUI.Graph("vely", _animator.GetFloat("VelocityZ"));
     }
 
-    private void LateUpdate()
+    private void FixedUpdate()
     {
-        performAnimation();
+        //performAnimation();
     }
 
     private bool networkMove(ulong clientId, Vector3 oldPos, Vector3 newPos)
     {
         return true;
     }
-
     private void performAnimation()
     {
 
@@ -286,8 +291,11 @@ public class PlayerController : NetworkBehaviour
         {
             Vector3 localVel = (transform.position - _lastPosition) / Time.deltaTime;
             localVel = transform.InverseTransformDirection(localVel);
-            _animator.SetFloat("VelocityX", (localVel.x / maxShiftSpeed) * 2);
-            _animator.SetFloat("VelocityZ", (localVel.z / maxShiftSpeed) * 2);
+            localVel = (localVel / maxShiftSpeed) * 2 * animmultiplier;
+            //_animator.SetFloat("VelocityX", (_animator.GetFloat("VelocityX") * 0.9f + localVel.x *0.1f));
+            //_animator.SetFloat("VelocityZ", (_animator.GetFloat("VelocityZ") * 0.9f + localVel.z * 0.1f));
+            _animator.SetFloat("VelocityX", localVel.x);
+            _animator.SetFloat("VelocityZ", localVel.z);
             _lastPosition = transform.position;
         }
     }

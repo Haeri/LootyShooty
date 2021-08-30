@@ -4,12 +4,10 @@ using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
-    [SerializeField]
-    public GameObject itemTextPanel;
-    [SerializeField]
-    public GameObject hitmarker;
-    [SerializeField]
-    public GameObject damagemarker;
+    [SerializeField] public GameObject itemTextPanel;
+    [SerializeField] public GameObject hitmarker;
+    [SerializeField] public GameObject damagemarker;
+    [SerializeField] public GameObject networkInfo;
 
     private static UIManager _instance;
 

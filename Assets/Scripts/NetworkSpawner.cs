@@ -10,6 +10,8 @@ public class NetworkSpawner : NetworkBehaviour
     public GameObject playerPrefab;
     public GameObject spectatorCamera;
 
+
+
     private static NetworkSpawner _instance;
 
     private void Awake()
@@ -29,10 +31,11 @@ public class NetworkSpawner : NetworkBehaviour
         return _instance;
     }
 
-    private void spawnPlayer(ulong clientID)
+    private void spawnPlayer(ulong clientID, string name)
     {
         GameObject go = Instantiate(playerPrefab, new Vector3(0, 5, 0), Quaternion.identity);
         go.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientID);
+        go.GetComponent<NetworkPlayer>().playerName.Value = name;
         Debug.Log("Player Spawned " + clientID);
     }
 
@@ -40,13 +43,20 @@ public class NetworkSpawner : NetworkBehaviour
     {
         startupClient(defaultIP, defaultPort);
     }
-    public void startupClient(string ip, int port)
+    public void startupClient(string ip, int port, string name = "")
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
+            NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = port;
             NetworkManager.Singleton.StartClient();
+
+            if(name == "")
+            {
+                name = "Player_" + NetworkManager.Singleton.LocalClientId;
+            }
+            spawnPlayer(NetworkManager.Singleton.LocalClientId, name);
         };
     }
     
@@ -54,13 +64,20 @@ public class NetworkSpawner : NetworkBehaviour
     {
         startupHost(defaultIP, defaultPort);
     }
-    public void startupHost(string ip, int port)
+    public void startupHost(string ip, int port, string name = "")
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
+            NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
             NetworkManager.Singleton.StartHost();
+
+            if (name == "")
+            {
+                name = "Host_" + NetworkManager.Singleton.LocalClientId;
+            }
+            spawnPlayer(NetworkManager.Singleton.LocalClientId, name);
         };
     }
 
@@ -72,7 +89,7 @@ public class NetworkSpawner : NetworkBehaviour
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
-            Instantiate(spectatorCamera);
+            //Instantiate(spectatorCamera);
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
             NetworkManager.Singleton.StartServer();

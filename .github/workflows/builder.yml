@@ -50,7 +50,7 @@ jobs:
         with:
           path: Library
           key: Library-Server-StandaloneLinux64
-          restore-keys: Library-
+          restore-keys: Library-Server-
       - uses: game-ci/unity-builder@v2.0-alpha-9
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}

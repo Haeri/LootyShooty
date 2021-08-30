@@ -35,7 +35,7 @@ public class ViewController : NetworkBehaviour
     private Vector2 _recoil;
     private Vector2 _recoilReverse;
 
-    public int sightIndex = 0;
+    public NetworkVariable<int> sightIndex = new NetworkVariable<int>(0);
 
     private void Awake()
     {
@@ -107,7 +107,7 @@ public class ViewController : NetworkBehaviour
             if (_gun != null)
             {
                 int len = _gun.sights.Count;
-                int index = Math.Abs(sightIndex % len);
+                int index = Math.Abs(sightIndex.Value % len);
 
                 pos = _gun.sights[index].sightTransform.localPosition * -1;
                 rot = Quaternion.Inverse(_gun.sights[index].sightTransform.localRotation);
@@ -164,7 +164,7 @@ public class ViewController : NetworkBehaviour
     {
         if (isAds.Value)
         {
-            sightIndex += Math.Sign(input);
+            sightIndex.Value += Math.Sign(input);
         }
     }
 
