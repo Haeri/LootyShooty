@@ -33,7 +33,7 @@ public class Entrypoint : MonoBehaviour
                 WriteDefaultConfig();
             }
 
-            NetworkSpawner.getInstance().startupServer(cfg.ip, cfg.port);
+            ConnectionManager.getInstance().startupServer(cfg.ip, cfg.port);
         }
     }
 

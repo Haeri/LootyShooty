@@ -42,17 +42,18 @@ public class Gun : NetworkBehaviour
     private bool isReloading;
     private float reloadProgress = 0;
     private Vector3 magStore = new Vector3(-0.1f, -0.3f, -0.2f);
-    private bool _networkInitialized = false;
 
-    private void Awake()
-    {
-        NetworkManager.Singleton.OnServerStarted += onServerStart;
-        NetworkManager.Singleton.OnClientConnectedCallback += onClientConnect;
-    }
 
     void Start()
     {
         audioSource = GetComponent<AudioSource>();
+
+        if(IsClient && !IsServer)
+        {
+            // Remove Rigidbody, since this is a newtwork object and
+            // the server is going to take care of physics simulation
+            Destroy(GetComponent<Rigidbody>());
+        }
     }
 
     void Update()
@@ -196,19 +197,4 @@ public class Gun : NetworkBehaviour
         }
     }
 
-    
-
-    private void onServerStart()
-    {
-        _networkInitialized = true;
-    }
-    private void onClientConnect(ulong id)
-    {
-        if (!_networkInitialized)
-        {
-            _networkInitialized = true;
-            Debug.Log("Destroy Rigidbody");
-            Destroy(GetComponent<Rigidbody>());
-        }
-    }
 }

@@ -30,7 +30,7 @@ public class UIManager : MonoBehaviour
 
     public void disconnect()
     {
-        NetworkSpawner.getInstance().Disconnect();
+        ConnectionManager.getInstance().Disconnect();
     }
 
 }

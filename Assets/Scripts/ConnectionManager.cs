@@ -2,17 +2,30 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using MLAPI;
 using MLAPI.Transports.UNET;
+using MLAPI.Messaging;
+using System.Collections.Generic;
+using System.Text;
 
-public class NetworkSpawner : NetworkBehaviour
+public class ConnectionManager : NetworkBehaviour
 {
     public string defaultIP = "127.0.0.1";
     public int defaultPort = 7777;
     public GameObject playerPrefab;
     public GameObject spectatorCamera;
 
+    public struct ConnectionPayload
+    {
+        public string name;
+    }
 
+    public struct PlayerData
+    {
+        public string name;
+    }
 
-    private static NetworkSpawner _instance;
+    private Dictionary<ulong, PlayerData> clientData;
+
+    private static ConnectionManager _instance;
 
     private void Awake()
     {
@@ -25,18 +38,28 @@ public class NetworkSpawner : NetworkBehaviour
             _instance = this;
         }
     }
-
-    public static NetworkSpawner getInstance()
+    public static ConnectionManager getInstance()
     {
         return _instance;
+    }
+
+
+    private void Start()
+    {
+        //NetworkManager.Singleton.OnServerStarted += HandleServerStarted;
+        NetworkManager.Singleton.OnClientConnectedCallback += handleClientConnected;
+        //NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnect;
+        NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
+        NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
     }
 
     private void spawnPlayer(ulong clientID, string name)
     {
         GameObject go = Instantiate(playerPrefab, new Vector3(0, 5, 0), Quaternion.identity);
+        go.name = name;
         go.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientID);
         go.GetComponent<NetworkPlayer>().playerName.Value = name;
-        Debug.Log("Player Spawned " + clientID);
+        Debug.Log($"Spawned Player {name} ID:[{clientID}]");
     }
 
     public void startupClient()
@@ -47,16 +70,17 @@ public class NetworkSpawner : NetworkBehaviour
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
-            NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
+            var payload = JsonUtility.ToJson(new ConnectionPayload()
+            {
+                name = name
+            });
+
+            byte[] payloadBytes = Encoding.ASCII.GetBytes(payload);
+
+            NetworkManager.Singleton.NetworkConfig.ConnectionData = payloadBytes;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = port;
             NetworkManager.Singleton.StartClient();
-
-            if(name == "")
-            {
-                name = "Player_" + NetworkManager.Singleton.LocalClientId;
-            }
-            spawnPlayer(NetworkManager.Singleton.LocalClientId, name);
         };
     }
     
@@ -68,11 +92,11 @@ public class NetworkSpawner : NetworkBehaviour
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
-            NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
+            NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
             NetworkManager.Singleton.StartHost();
-
+           
             if (name == "")
             {
                 name = "Host_" + NetworkManager.Singleton.LocalClientId;
@@ -89,11 +113,25 @@ public class NetworkSpawner : NetworkBehaviour
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
-            //Instantiate(spectatorCamera);
+            NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
             NetworkManager.Singleton.StartServer();
         };
+    }
+
+
+    private void handleClientConnected(ulong clientId)
+    {
+
+    }
+
+    private void ApprovalCheck(byte[] connectionData, ulong clientId, NetworkManager.ConnectionApprovedDelegate callback)
+    {
+        string payload = Encoding.ASCII.GetString(connectionData);
+        var connectionPayload = JsonUtility.FromJson<ConnectionPayload>(payload);      
+        callback(false, null, true, null, null);
+        spawnPlayer(clientId, connectionPayload.name);
     }
 
     public void Disconnect()
