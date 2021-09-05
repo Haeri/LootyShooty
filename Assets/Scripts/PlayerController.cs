@@ -139,8 +139,9 @@ public class PlayerController : NetworkBehaviour
         inputMaster.Player.Reload.performed += ctx => Reload();
         inputMaster.Player.Fire.started += ctx => _isShooting = true;
         inputMaster.Player.Fire.canceled += ctx => _isShooting = false;
-        inputMaster.Player.ADS.started += ctx => doAdsServerRpc(true);
-        inputMaster.Player.ADS.canceled += ctx => doAdsServerRpc(false);
+        inputMaster.Player.ADS.started += ctx => doAds(true);
+        inputMaster.Player.ADS.canceled += ctx => doAds(false);
+        inputMaster.Player.CycleSight.performed += ctx => cycleSight(ctx.ReadValue<float>());
         inputMaster.Player.Drop.performed += ctx => dropItemServerRpc();
         inputMaster.Player.Take.performed += ctx => pickupItemServerRpc();
         inputMaster.Enable();
@@ -167,7 +168,7 @@ public class PlayerController : NetworkBehaviour
 
         if (_isShooting && _gun != null)
         {
-            _gun.shoot();
+            _gun.Shoot();
         }
 
 
@@ -520,10 +521,14 @@ public class PlayerController : NetworkBehaviour
     }
 
 
-    [ServerRpc]
-    private void doAdsServerRpc(bool ads)
+    
+    private void doAds(bool ads)
     {
         _viewController.setADS(ads);
+    }
+    private void cycleSight(float index)
+    {
+        _viewController.cycleSight(index);
     }
 
     private void OnDeath()

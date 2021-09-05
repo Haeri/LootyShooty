@@ -25,6 +25,7 @@ public class Gun : NetworkBehaviour
     public float fireRate = 1;
     public float reloadSpeed = 1;
     public int bullets = 30;
+    public int bulletCapacity = 30;
 
     public GameObject bullet;
     public Transform muzzle;
@@ -85,25 +86,25 @@ public class Gun : NetworkBehaviour
                 {
                     transform.parent.localPosition += new Vector3(0, 0.03f, 0);
                 }
-                bullets = 30;
+                bullets = bulletCapacity;
             }
         }
     }
 
-    public void shoot()
+    public void Shoot()
     {
         // Perform action on server
         ShootServerRpc(OwnerClientId);
 
         // Dont perform action on the host, as Host is also server
-        if (!IsHost)
+        if (!IsServer)
         {
             // Perform action locally
             if (bullets > 0)
             {
                 if (timeToFire && !isReloading)
                 {
-                    shootAction(true);
+                    ShootAction(false);
 
                     --bullets;
                     timeToFire = false;
@@ -111,12 +112,12 @@ public class Gun : NetworkBehaviour
             }
             else
             {
-                Reload();
+                ReloadAction(false);
             }
         }
     }
 
-    private void shootAction(bool blank)
+    private void ShootAction(bool isRealAction)
     {
         //Debug.Log("Shoot " + (blank ? "fake" : "real") + " bullets");
         audioSource.PlayOneShot(audioSource.clip);
@@ -124,7 +125,7 @@ public class Gun : NetworkBehaviour
         GameObject b = ObjectPool.getInstance().instanciate(bullet);
         b.transform.position = muzzle.position;
         b.transform.rotation = muzzle.rotation;
-        b.GetComponent<Projectile>().blank = blank;
+        b.GetComponent<Projectile>().blank = !isRealAction;
         if (transform.parent != null)
         {
             b.GetComponent<Projectile>().shooter = transform.parent.parent.parent.gameObject;
@@ -148,10 +149,7 @@ public class Gun : NetworkBehaviour
         {
             if (timeToFire && !isReloading)
             {
-                if (IsServer)
-                {
-                    shootAction(false);
-                }
+                ShootAction(true);                
                 ShootClientRpc(shooter);
 
                 --bullets;
@@ -160,23 +158,31 @@ public class Gun : NetworkBehaviour
         }
         else
         {
-            Reload();
+            ReloadServerRPC(shooter);
         }
     }
 
     [ClientRpc]
-    public void ShootClientRpc(ulong shooter)
+    private void ShootClientRpc(ulong shooter)
     {
-        if (IsHost) return;
-
         // Replicate shooting on all clients except for the original one
         if (shooter != NetworkManager.LocalClientId)
         {   
-            shootAction(true);
+            ShootAction(false);
         }
     }
 
     public void Reload()
+    {
+        ReloadServerRPC(OwnerClientId);
+
+        if (!IsServer)
+        {
+            ReloadAction(false);
+        }
+    }
+
+    private void ReloadAction(bool isRealAction)
     {
         if (!isReloading)
         {
@@ -197,4 +203,19 @@ public class Gun : NetworkBehaviour
         }
     }
 
+    [ServerRpc]
+    private void ReloadServerRPC(ulong initialtor)
+    {
+        ReloadAction(true);
+        ReloadClientRPC(initialtor);
+    }
+
+    [ClientRpc]
+    private void ReloadClientRPC(ulong initialtor)
+    {
+        if (initialtor != NetworkManager.LocalClientId)
+        {
+            ReloadAction(false);
+        }
+    }
 }

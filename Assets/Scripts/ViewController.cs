@@ -24,7 +24,6 @@ public class ViewController : NetworkBehaviour
     private Transform holderTransform;
     private Vector3 holderPosition;
     private Quaternion holderRotation;
-    public NetworkVariableBool isAds = new NetworkVariableBool(false);
     public float zoomFov = 60;
     private Camera cam;
     public float adsSpeed = 3;
@@ -35,7 +34,8 @@ public class ViewController : NetworkBehaviour
     private Vector2 _recoil;
     private Vector2 _recoilReverse;
 
-    public NetworkVariable<int> sightIndex = new NetworkVariable<int>(0);
+    public NetworkVariableBool isAds = new NetworkVariableBool(new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly }, false);
+    public NetworkVariable<int> sightIndex = new NetworkVariable<int>(new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly }, 0);
 
     private void Awake()
     {
@@ -56,7 +56,6 @@ public class ViewController : NetworkBehaviour
         {
             inputMaster = new InputMaster();
             inputMaster.Player.Look.performed += ctx => lookInput = ctx.ReadValue<Vector2>();
-            inputMaster.Player.CycleSight.performed += ctx => cycleSight(ctx.ReadValue<float>());
             inputMaster.Player.MouseLock.performed += ctx => ToggleMouseLock();
             inputMaster.Enable();
 
@@ -160,7 +159,7 @@ public class ViewController : NetworkBehaviour
         isAds.Value = ads;
     }
 
-    private void cycleSight(float input)
+    public void cycleSight(float input)
     {
         if (isAds.Value)
         {
