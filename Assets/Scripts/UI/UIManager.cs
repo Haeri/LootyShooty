@@ -8,6 +8,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] public GameObject hitmarker;
     [SerializeField] public GameObject damagemarker;
     [SerializeField] public GameObject networkInfo;
+    [SerializeField] public GameObject killFeed;
 
     private static UIManager _instance;
 

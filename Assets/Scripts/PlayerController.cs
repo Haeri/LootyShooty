@@ -114,8 +114,6 @@ public class PlayerController : NetworkBehaviour
         {
             _playerHealth.OnDamage += OnDamage;
             _playerHealth.OnDeath += OnDeath;
-
-            Debug.Log($"Player ({OwnerClientId}) joined the Game");
         }        
 
         if (!IsLocalPlayer)

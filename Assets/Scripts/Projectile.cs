@@ -29,13 +29,13 @@ public class Projectile : MonoBehaviour
         }
         if (dmg != null)
         {
-            damage = (int)(damage * multiplier);
             // Do damage
-            Debug.Log($"Player({shooter.GetComponent<NetworkObject>().OwnerClientId}) shot {dmg.name}. {dmg.health.Value}hp -> {dmg.health.Value - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
-            if (!blank)
+            if (!blank && !dmg.IsDead())
             {
+                damage = (int)(damage * multiplier);
+                Debug.Log($"Player({shooter.GetComponent<NetworkPlayer>().playerName.Value}) shot {dmg.name}. {dmg.health.Value}hp -> {dmg.health.Value - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
                 bool died = dmg.TakeDamage(damage);
-                shooter?.GetComponent<PlayerController>()?.enemyHitCallback(dmg.gameObject, damage, died);
+                shooter?.GetComponent<PlayerController>()?.enemyHitCallback(dmg.gameObject, damage, died);                
             }
 
             // Display hit FX

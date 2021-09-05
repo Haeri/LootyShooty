@@ -16,8 +16,18 @@ public class Damagable : NetworkBehaviour
     public event Action<int> OnDamage;
     public event Action OnDeath;
 
+    public bool IsDead()
+    {
+        return health.Value <= 0;
+    }
+
     public bool TakeDamage(int amount)
     {
+        if (health.Value == 0)
+        {
+            return false;
+        }
+
         health.Value -= amount;
         OnDamage?.Invoke(amount);
         

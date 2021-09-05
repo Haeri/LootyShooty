@@ -281,6 +281,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   damage: 40
   maxPenetration: 3
-  deflectionAngle: 20
+  deflectionAngle: 8
   blank: 0
   bulletHole: {fileID: 3789393597050150251, guid: 029c1dbe7f9d7b948ae5f65bb3a32be4, type: 3}
+  shooter: {fileID: 0}
