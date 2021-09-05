@@ -124,7 +124,7 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
-        NetworkManager.Singleton.OnClientDisconnectCallback += onDisconnect;
+        //NetworkManager.Singleton.OnClientDisconnectCallback += onDisconnect;
 
         _itemTextPanel = UIManager.getInstance().itemTextPanel;
         _itemText = _itemTextPanel.transform.GetChild(0).GetComponent<Text>();
@@ -140,7 +140,7 @@ public class PlayerController : NetworkBehaviour
         inputMaster.Player.ADS.started += ctx => doAds(true);
         inputMaster.Player.ADS.canceled += ctx => doAds(false);
         inputMaster.Player.CycleSight.performed += ctx => cycleSight(ctx.ReadValue<float>());
-        inputMaster.Player.Drop.performed += ctx => dropItemServerRpc();
+        inputMaster.Player.Drop.performed += ctx => DropItem();
         inputMaster.Player.Take.performed += ctx => pickupItemServerRpc();
         inputMaster.Enable();
 
@@ -364,7 +364,7 @@ public class PlayerController : NetworkBehaviour
         //gameObject.layer = 9;
         if (Physics.Raycast(_cameraObject.transform.position, _cameraObject.transform.forward, out hit, maxPickupDistance))//, gameObject.layer))
         {
-            PhysicalItem pi = hit.collider.GetComponent<PhysicalItem>();
+            NetworkPhysicsItem pi = hit.collider.GetComponent<NetworkPhysicsItem>();
             if (pi != null)
             {
                 Debug.DrawRay(_cameraObject.transform.position, _cameraObject.transform.forward * maxPickupDistance, Color.green);
@@ -417,7 +417,7 @@ public class PlayerController : NetworkBehaviour
         if (newGun != null)
         {
             // Chech if we already have a gun
-            if (_gun != null) dropItemServerRpc();
+            if (_gun != null) DropItemServerRpc();
 
             newGun.GetComponent<NetworkObject>().ChangeOwnership(OwnerClientId);
 
@@ -468,41 +468,17 @@ public class PlayerController : NetworkBehaviour
         }
     }
 
-    [ServerRpc]
-    private void dropItemServerRpc()
+
+    public void DropItem()
     {
-        Debug.Log("Drop on server");
-        //Debug.Break();
         if (_gun != null)
         {
-            _gun.GetComponent<NetworkObject>().RemoveOwnership();
-
-            if (!IsHost)
-            {
-                Debug.Log("Not Host");
-                _gun.transform.parent = null;
-                _gun.GetComponent<Rigidbody>().isKinematic = false;
-                _gun.GetComponent<Rigidbody>().AddForce(transform.forward * 150);
-                _gun.GetComponent<BoxCollider>().enabled = true;
-                _gun.GetComponent<NetworkTransform>().enabled = true;
-
-                _gun = null;
-                _viewController.equipGun(null);
-                
-                
-                right_hand_ik.weight = 0;
-                left_hand_ik.weight = 0;
-            }
-            dropItemClientRpc();
+            DropItemServerRpc();
         }
     }
 
-    [ClientRpc]
-    private void dropItemClientRpc()
+    private void DropItemAction()
     {
-        Debug.Log("Drop on client " + OwnerClientId);
-        //Debug.Break();
-        
         _gun.transform.parent = null;
         if (IsServer)
         {
@@ -514,8 +490,29 @@ public class PlayerController : NetworkBehaviour
 
         _gun = null;
         _viewController.equipGun(null);
+
         right_hand_ik.weight = 0;
-        left_hand_ik.weight = 0;     
+        left_hand_ik.weight = 0;
+    }
+
+    [ServerRpc]
+    private void DropItemServerRpc()
+    {
+        if (_gun != null)
+        {
+            _gun.GetComponent<NetworkObject>().RemoveOwnership();
+            DropItemAction();
+            dropItemClientRpc();
+        }
+    }
+
+    [ClientRpc]
+    private void dropItemClientRpc()
+    {
+        if (!IsHost)
+        {
+            DropItemAction();
+        }
     }
 
 
@@ -531,30 +528,7 @@ public class PlayerController : NetworkBehaviour
 
     private void OnDeath()
     {
-        //Debug.Break();
-        //transform.Find("Capsule").GetComponent<MeshRenderer>().material.color = new Color(1, 0, 0);
-        //dropItemServerRpc();
-
-
-        Debug.Log("Drop on server manual mode");
-        
-        if (_gun != null)
-        {
-            _gun.GetComponent<NetworkObject>().RemoveOwnership();
-
-            if (!IsHost)
-            {
-                _gun.transform.parent = null;
-                _gun.GetComponent<Rigidbody>().isKinematic = false;
-                _gun.GetComponent<Rigidbody>().AddForce(transform.forward * 150);
-                _gun.GetComponent<BoxCollider>().enabled = true;
-                _gun.GetComponent<NetworkTransform>().enabled = true;
-
-                _gun = null;
-                _viewController.equipGun(null);
-            }
-            dropItemClientRpc();        
-        }
+        DropItemServerRpc();
 
         onDeathClientRpc();
 
@@ -620,15 +594,16 @@ public class PlayerController : NetworkBehaviour
         UIManager.getInstance().damagemarker.GetComponent<UIFader>().ResetFade();
     }
 
+    /*
     private void onDisconnect(ulong clientId)
     {
         if(clientId == OwnerClientId)
         {
-            dropItemServerRpc();
+            DropItemServerRpc();
             Debug.Log($"Player ({OwnerClientId}) Disconnected from the Game");
         }
     }
-
+    */
     private void OnEnable()
     {
         if (!IsLocalPlayer) return;

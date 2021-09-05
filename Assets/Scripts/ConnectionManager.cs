@@ -48,7 +48,7 @@ public class ConnectionManager : NetworkBehaviour
     {
         //NetworkManager.Singleton.OnServerStarted += HandleServerStarted;
         NetworkManager.Singleton.OnClientConnectedCallback += handleClientConnected;
-        //NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnect;
+        NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnect;
         NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
         NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
     }
@@ -124,6 +124,20 @@ public class ConnectionManager : NetworkBehaviour
     private void handleClientConnected(ulong clientId)
     {
 
+    }
+
+    private void HandleClientDisconnect(ulong clientId)
+    {
+        if (IsServer)
+        {
+            
+            foreach (ulong key in NetworkManager.Singleton.ConnectedClients.Keys)
+            {
+                Debug.Log("Dict: "+  key);
+            }
+            Debug.Log("client: " + clientId);
+            NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject.GetComponent<PlayerController>().DropItem();
+        }
     }
 
     private void ApprovalCheck(byte[] connectionData, ulong clientId, NetworkManager.ConnectionApprovedDelegate callback)
