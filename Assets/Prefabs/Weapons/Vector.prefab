@@ -500,11 +500,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   recoil: {x: -2, y: 0, z: 2}
   kickback: {x: 0, y: 0.01, z: -0.06}
+  mouseRecoil: {x: 0, y: 0}
   kickbackRandomScalar: 0.001
   muzzleVelocity: 5000
   fireRate: 300
   reloadSpeed: 1.3
   bullets: 50
+  bulletCapacity: 30
   bullet: {fileID: 3011444603068346856, guid: 0b78ade87a60f5245a604a95f694deda, type: 3}
   muzzle: {fileID: 4678883891524273779}
   mag: {fileID: 8524724767248589397}
@@ -544,7 +546,7 @@ MonoBehaviour:
   PrefabHash: 9497847260117980084
   PrefabHashGenerator: Vector
   AlwaysReplicateAsRoot: 0
-  DontDestroyWithOwner: 0
+  DontDestroyWithOwner: 1
 --- !u!114 &4461275159201097490
 MonoBehaviour:
   m_ObjectHideFlags: 0

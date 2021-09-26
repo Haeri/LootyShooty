@@ -536,6 +536,7 @@ MonoBehaviour:
   fireRate: 80
   reloadSpeed: 1.3
   bullets: 30
+  bulletCapacity: 30
   bullet: {fileID: 3011444603068346856, guid: 0b78ade87a60f5245a604a95f694deda, type: 3}
   muzzle: {fileID: 8731726810673686070}
   mag: {fileID: 5732527463208845840}
@@ -575,7 +576,7 @@ MonoBehaviour:
   PrefabHash: 15595933728626640398
   PrefabHashGenerator: AKM
   AlwaysReplicateAsRoot: 0
-  DontDestroyWithOwner: 0
+  DontDestroyWithOwner: 1
 --- !u!114 &4198587118614968868
 MonoBehaviour:
   m_ObjectHideFlags: 0

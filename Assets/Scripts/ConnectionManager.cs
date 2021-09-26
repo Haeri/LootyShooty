@@ -136,7 +136,7 @@ public class ConnectionManager : NetworkBehaviour
                 Debug.Log("Dict: "+  key);
             }
             Debug.Log("client: " + clientId);
-            NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject.GetComponent<PlayerController>().DropItem();
+            //NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject.GetComponent<PlayerController>().DropItem();
         }
     }
 

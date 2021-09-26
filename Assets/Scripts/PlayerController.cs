@@ -102,6 +102,8 @@ public class PlayerController : NetworkBehaviour
         DebugGUI.SetGraphProperties("speedcap", "Cap", 0, 20, 1, new Color(1, 0, 1), true);
     }
 
+    
+
     void Start()
     {
         if (OwnerClientId == 0)
@@ -616,4 +618,20 @@ public class PlayerController : NetworkBehaviour
 
         inputMaster.Disable();
     }
+    /*
+    
+    void OnDestroy()
+    {
+        Debug.Log("OnDestroy Call");
+        if (IsServer)
+        {
+            if (_gun != null)
+            {
+                _gun.GetComponent<NetworkObject>().RemoveOwnership();
+                DropItemAction();
+                dropItemClientRpc();
+            }
+        }
+    }
+    */
 }

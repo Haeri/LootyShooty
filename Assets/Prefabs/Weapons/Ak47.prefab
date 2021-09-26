@@ -684,6 +684,7 @@ MonoBehaviour:
   fireRate: 100
   reloadSpeed: 1.3
   bullets: 30
+  bulletCapacity: 30
   bullet: {fileID: 3011444603068346856, guid: 0b78ade87a60f5245a604a95f694deda, type: 3}
   muzzle: {fileID: 4709512191757220388}
   mag: {fileID: 8644897513625017858}
@@ -723,7 +724,7 @@ MonoBehaviour:
   PrefabHash: 1781272051898067554
   PrefabHashGenerator: Ak47
   AlwaysReplicateAsRoot: 0
-  DontDestroyWithOwner: 0
+  DontDestroyWithOwner: 1
 --- !u!114 &4469339816535738637
 MonoBehaviour:
   m_ObjectHideFlags: 0
