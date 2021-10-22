@@ -4,10 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Rendering;
 using UnityEngine.InputSystem;
-using MLAPI;
-using MLAPI.Prototyping;
-using MLAPI.Messaging;
-using MLAPI.Spawning;
+using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine.Animations.Rigging;
 
 public class PlayerController : NetworkBehaviour
@@ -366,7 +364,7 @@ public class PlayerController : NetworkBehaviour
         //gameObject.layer = 9;
         if (Physics.Raycast(_cameraObject.transform.position, _cameraObject.transform.forward, out hit, maxPickupDistance))//, gameObject.layer))
         {
-            NetworkPhysicsItem pi = hit.collider.GetComponent<NetworkPhysicsItem>();
+            NetworkItem pi = hit.collider.GetComponent<NetworkItem>();
             if (pi != null)
             {
                 Debug.DrawRay(_cameraObject.transform.position, _cameraObject.transform.forward * maxPickupDistance, Color.green);
@@ -445,7 +443,7 @@ public class PlayerController : NetworkBehaviour
         newGun.GetComponent<NetworkTransform>().enabled = false;
 
         _gun = newGun;
-        _viewController.equipGun(_gun);
+        _viewController.EquipGun(_gun);
 
         left_arm_target.localPosition = _gun.handle.localPosition;
         left_arm_target.localRotation = _gun.handle.localRotation;
@@ -456,7 +454,7 @@ public class PlayerController : NetworkBehaviour
     [ClientRpc]
     private void equipItemClientRpc(ulong nid)
     {
-        NetworkObject no = NetworkSpawnManager.SpawnedObjects[nid];
+        NetworkObject no = NetworkManager.Singleton.SpawnManager.SpawnedObjects[nid];
         Gun newGun = no.gameObject.GetComponent<Gun>();
 
         equipItem(newGun);
@@ -491,7 +489,7 @@ public class PlayerController : NetworkBehaviour
         _gun.GetComponent<NetworkTransform>().enabled = true;
 
         _gun = null;
-        _viewController.equipGun(null);
+        _viewController.EquipGun(null);
 
         right_hand_ik.weight = 0;
         left_hand_ik.weight = 0;
@@ -580,7 +578,7 @@ public class PlayerController : NetworkBehaviour
     [ClientRpc]
     public void enemyHitClientRpc(ulong target, int damage, bool died, ClientRpcParams clientRpcParams = default)
     {
-        GameObject other = NetworkSpawnManager.SpawnedObjects[target].gameObject;
+        GameObject other = NetworkManager.Singleton.SpawnManager.SpawnedObjects[target].gameObject;
 
         //Debug.Log("I hit " + other.name + " damage: " + damage + (died ? " He dead!" : ""));
         flashHit();

@@ -1,9 +1,8 @@
-﻿using System;
+﻿using Unity.Netcode;
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using MLAPI;
-using MLAPI.NetworkVariable;
 using Random = UnityEngine.Random;
 
 public class ViewController : NetworkBehaviour
@@ -34,8 +33,8 @@ public class ViewController : NetworkBehaviour
     private Vector2 _recoil;
     private Vector2 _recoilReverse;
 
-    public NetworkVariableBool isAds = new NetworkVariableBool(new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly }, false);
-    public NetworkVariable<int> sightIndex = new NetworkVariable<int>(new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly }, 0);
+    public NetworkVariable<bool> isAds = new NetworkVariable<bool>(/*new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly },*/ false);
+    public NetworkVariable<int> sightIndex = new NetworkVariable<int>(/*new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly }, */ 0);
 
     private void Awake()
     {
@@ -172,12 +171,12 @@ public class ViewController : NetworkBehaviour
         Cursor.lockState = Cursor.lockState == CursorLockMode.Locked ? CursorLockMode.None : CursorLockMode.Locked;
     }
 
-    public void equipGun(Gun gun)
+    public void EquipGun(Gun gun)
     {
         _gun = gun;
     }
 
-    public void addRecoid(Vector2 direction)
+    public void AddRecoid(Vector2 direction)
     {
         Vector2 rand = Random.insideUnitCircle.normalized * variance;
         direction += rand;

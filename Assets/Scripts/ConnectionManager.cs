@@ -1,10 +1,9 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using MLAPI;
-using MLAPI.Transports.UNET;
-using MLAPI.Messaging;
+using Unity.Netcode;
 using System.Collections.Generic;
 using System.Text;
+using Unity.Netcode.Transports.UNET;
 
 public class ConnectionManager : NetworkBehaviour
 {
@@ -47,9 +46,8 @@ public class ConnectionManager : NetworkBehaviour
     private void Start()
     {
         //NetworkManager.Singleton.OnServerStarted += HandleServerStarted;
-        NetworkManager.Singleton.OnClientConnectedCallback += handleClientConnected;
+        NetworkManager.Singleton.OnClientConnectedCallback += HandleClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnect;
-        NetworkManager.Singleton.NetworkConfig.CreatePlayerPrefab = false;
         NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
     }
 
@@ -58,7 +56,7 @@ public class ConnectionManager : NetworkBehaviour
         GameObject go = Instantiate(playerPrefab, new Vector3(0, 5, 0), Quaternion.identity);
         go.name = name;
         go.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientID);
-        go.GetComponent<NetworkPlayer>().playerName.Value = name;
+        go.GetComponent<NetworkPlayer>().playerName.Value = "Player_"+name;
         Debug.Log($"Spawned Player {name} ID:[{clientID}]");
     }
 
@@ -92,6 +90,14 @@ public class ConnectionManager : NetworkBehaviour
     {
         SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
         {
+            var payload = JsonUtility.ToJson(new ConnectionPayload()
+            {
+                name = name
+            });
+
+            byte[] payloadBytes = Encoding.ASCII.GetBytes(payload);
+
+            NetworkManager.Singleton.NetworkConfig.ConnectionData = payloadBytes;
             NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
             NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
@@ -102,6 +108,7 @@ public class ConnectionManager : NetworkBehaviour
                 name = "Host_" + NetworkManager.Singleton.LocalClientId;
             }
             spawnPlayer(NetworkManager.Singleton.LocalClientId, name);
+           
         };
     }
 
@@ -121,9 +128,28 @@ public class ConnectionManager : NetworkBehaviour
     }
 
 
-    private void handleClientConnected(ulong clientId)
+    private void HandleClientConnected(ulong clientId)
     {
+        if (IsServer)
+        {
+            //spawnPlayer(clientId, "PETER");
+            /*
+            return;
+            SetSeedClientRPC(Random.seed, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams
+                {
+                    TargetClientIds = new ulong[] { clientId }
+                }
+            });
+            */
+        }
+    }
 
+    [ClientRpc]
+    private void SetSeedClientRPC(int seed, ClientRpcParams clientRpcParams = default)
+    {
+        Random.InitState(seed);
     }
 
     private void HandleClientDisconnect(ulong clientId)
@@ -144,26 +170,13 @@ public class ConnectionManager : NetworkBehaviour
     {
         string payload = Encoding.ASCII.GetString(connectionData);
         var connectionPayload = JsonUtility.FromJson<ConnectionPayload>(payload);      
+        //spawnPlayer(clientId, connectionPayload.name);
         callback(false, null, true, null, null);
-        spawnPlayer(clientId, connectionPayload.name);
     }
 
     public void Disconnect()
     {
-        if (IsHost)
-        {
-            NetworkManager.Singleton.StopHost();
-        }
-        else if (IsClient)
-        {
-            NetworkManager.Singleton.StopClient();
-        }
-        else if (IsServer)
-        {
-            NetworkManager.Singleton.StopServer();
-        }
-
+        NetworkManager.Singleton.Shutdown();      
         SceneManager.LoadScene("MainMenu");
-
     }
 }

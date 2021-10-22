@@ -1,14 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using MLAPI;
-using MLAPI.Messaging;
-using MLAPI.NetworkVariable;
+using Unity.Netcode;
 using UnityEngine.UI;
+using Unity.Collections;
 
 public class NetworkPlayer : NetworkBehaviour
 {
-    public NetworkVariable<string> playerName;
+    public NetworkVariable<FixedString32Bytes> playerName;
     public NetworkVariable<int> ping;
 
     private float nextActionTime = 0.0f;

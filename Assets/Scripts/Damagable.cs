@@ -1,8 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using MLAPI;
-using MLAPI.NetworkVariable;
+using Unity.Netcode;
 using System;
 
 public class Damagable : NetworkBehaviour

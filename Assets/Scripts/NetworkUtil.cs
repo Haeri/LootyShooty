@@ -1,6 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using MLAPI;
 using UnityEngine.UI;
 
 public class NetworkUtil : MonoBehaviour

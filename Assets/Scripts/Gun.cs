@@ -1,8 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using MLAPI;
-using MLAPI.Messaging;
+using Unity.Netcode;
 
 [RequireComponent(typeof(AudioSource))]
 [RequireComponent(typeof(BoxCollider))]
@@ -138,7 +137,7 @@ public class Gun : NetworkBehaviour
             //transform.parent.localPosition += Util.vec3FromRandomAngle(kickback * 0.001f, kickbackRandomScalar);
             transform.parent.localRotation = Quaternion.Euler(recoil) * transform.parent.localRotation;
 
-            transform.parent.parent.GetComponent<ViewController>().addRecoid(mouseRecoil);
+            transform.parent.parent.GetComponent<ViewController>().AddRecoid(mouseRecoil);
         }
     }
 
