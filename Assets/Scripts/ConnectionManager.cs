@@ -103,12 +103,13 @@ public class ConnectionManager : NetworkBehaviour
             NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
             NetworkManager.Singleton.StartHost();
            
+            /*
             if (name == "")
             {
                 name = "Host_" + NetworkManager.Singleton.LocalClientId;
             }
             spawnPlayer(NetworkManager.Singleton.LocalClientId, name);
-           
+           */
         };
     }
 
@@ -171,7 +172,7 @@ public class ConnectionManager : NetworkBehaviour
         string payload = Encoding.ASCII.GetString(connectionData);
         var connectionPayload = JsonUtility.FromJson<ConnectionPayload>(payload);      
         //spawnPlayer(clientId, connectionPayload.name);
-        callback(false, null, true, null, null);
+        callback(true, null, true, null, null);
     }
 
     public void Disconnect()
