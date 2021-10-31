@@ -46,7 +46,7 @@ public class ConnectionManager : NetworkBehaviour
     private void Start()
     {
         //NetworkManager.Singleton.OnServerStarted += HandleServerStarted;
-        NetworkManager.Singleton.OnClientConnectedCallback += HandleClientConnected;
+        //NetworkManager.Singleton.OnClientConnectedCallback += HandleClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnect;
         NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
     }

@@ -59,7 +59,7 @@ public class NetworkPlayer : NetworkBehaviour
     [ClientRpc]
     private void PingClientRpc(float PingStart, ClientRpcParams clientRpcParams = default)
     {
-        ping.Value = (int)(Time.time - PingStart);
+        //ping.Value = (int)(Time.time - PingStart);
     }
 
 }

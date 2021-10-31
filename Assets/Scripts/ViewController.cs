@@ -155,10 +155,25 @@ public class ViewController : NetworkBehaviour
 
     public void setADS(bool ads)
     {
+        setADSServerRPC(ads);
+    }
+
+    [ServerRpc]
+    public void setADSServerRPC(bool ads)
+    {
         isAds.Value = ads;
     }
 
     public void cycleSight(float input)
+    {
+        if (isAds.Value)
+        {
+            cycleSightServerRPC(input);
+        }
+    }
+
+    [ServerRpc]
+    public void cycleSightServerRPC(float input)
     {
         if (isAds.Value)
         {

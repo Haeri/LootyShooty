@@ -47,13 +47,6 @@ public class Gun : NetworkBehaviour
     void Start()
     {
         audioSource = GetComponent<AudioSource>();
-
-        if(IsClient && !IsServer)
-        {
-            // Remove Rigidbody, since this is a newtwork object and
-            // the server is going to take care of physics simulation
-            Destroy(GetComponent<Rigidbody>());
-        }
     }
 
     void Update()

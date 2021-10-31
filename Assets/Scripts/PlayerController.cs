@@ -251,7 +251,8 @@ public class PlayerController : NetworkBehaviour
         DebugGUI.Graph("vertical", _velocity.y);
 
 
-        _characterController.Move(_velocity * Time.deltaTime);
+        MoveServerRPC(_velocity * Time.deltaTime);
+        
 
         if (_shouldJump) _shouldJump = false;
 
@@ -261,6 +262,12 @@ public class PlayerController : NetworkBehaviour
 
         DebugGUI.Graph("velx", _animator.GetFloat("VelocityX"));
         DebugGUI.Graph("vely", _animator.GetFloat("VelocityZ"));
+    }
+
+    [ServerRpc]
+    private void MoveServerRPC(Vector3 newpos)
+    {
+        _characterController.Move(newpos);
     }
 
     private void FixedUpdate()
