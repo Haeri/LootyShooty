@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class UIManager : MonoBehaviour
+public class UIManager : Singleton<UIManager>
 {
     [SerializeField] public GameObject itemTextPanel;
     [SerializeField] public GameObject hitmarker;
@@ -10,28 +10,10 @@ public class UIManager : MonoBehaviour
     [SerializeField] public GameObject networkInfo;
     [SerializeField] public GameObject killFeed;
 
-    private static UIManager _instance;
-
-    private void Awake()
-    {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(this.gameObject);
-        }
-        else
-        {
-            _instance = this;
-        }
-    }
-
-    public static UIManager getInstance()
-    {
-        return _instance;
-    }
 
     public void disconnect()
     {
-        ConnectionManager.getInstance().Disconnect();
+        ConnectionManager.Instance.Disconnect();
     }
 
 }

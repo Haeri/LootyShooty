@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Text;
 using Unity.Netcode.Transports.UNET;
 
-public class ConnectionManager : NetworkBehaviour
+public class ConnectionManager : NetworkSingleton<ConnectionManager>
 {
     public string defaultIP = "127.0.0.1";
     public int defaultPort = 7777;
@@ -23,24 +23,6 @@ public class ConnectionManager : NetworkBehaviour
     }
 
     private Dictionary<ulong, PlayerData> clientData;
-
-    private static ConnectionManager _instance;
-
-    private void Awake()
-    {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(gameObject);
-        }
-        else
-        {
-            _instance = this;
-        }
-    }
-    public static ConnectionManager getInstance()
-    {
-        return _instance;
-    }
 
 
     private void Start()

@@ -41,7 +41,7 @@ public class Projectile : MonoBehaviour
             // Display hit FX
             if (dmg.hitEffect != null)
             {
-                GameObject effect = ObjectPool.getInstance().instanciate(dmg.hitEffect);
+                GameObject effect = ObjectPool.Instance.instanciate(dmg.hitEffect);
                 effect.transform.localPosition = collision.contacts[0].point;
                 effect.transform.localRotation = Quaternion.LookRotation(collision.contacts[0].normal);
                 //effect.transform.SetParent(collision.transform);
@@ -76,9 +76,9 @@ public class Projectile : MonoBehaviour
         {
             //Debug.Log("Absorb");
             gameObject.SetActive(false);
-            //ObjectPool.getInstance().resetObject(gameObject);
+            //ObjectPool.Instance.resetObject(gameObject);
 
-            GameObject hole = ObjectPool.getInstance().instanciate(bulletHole);
+            GameObject hole = ObjectPool.Instance.instanciate(bulletHole);
             hole.transform.localPosition = (collision.contacts[0].point + norm * 0.01f);
             hole.transform.localRotation = Quaternion.LookRotation(collision.contacts[0].normal);
             //hole.transform.SetParent(collision.transform);

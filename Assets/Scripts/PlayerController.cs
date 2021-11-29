@@ -126,7 +126,7 @@ public class PlayerController : NetworkBehaviour
 
         //NetworkManager.Singleton.OnClientDisconnectCallback += onDisconnect;
 
-        _itemTextPanel = UIManager.getInstance().itemTextPanel;
+        _itemTextPanel = UIManager.Instance.itemTextPanel;
         _itemText = _itemTextPanel.transform.GetChild(0).GetComponent<Text>();
 
         inputMaster = new InputMaster();
@@ -594,11 +594,11 @@ public class PlayerController : NetworkBehaviour
     void flashHit()
     {
         GetComponent<AudioSource>().PlayOneShot(hitSound);
-        UIManager.getInstance().hitmarker.GetComponent<UIFader>().ResetFade();
+        UIManager.Instance.hitmarker.GetComponent<UIFader>().ResetFade();
     }
     void flashDamage()
     {
-        UIManager.getInstance().damagemarker.GetComponent<UIFader>().ResetFade();
+        UIManager.Instance.damagemarker.GetComponent<UIFader>().ResetFade();
     }
 
     /*

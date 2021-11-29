@@ -114,7 +114,7 @@ public class Gun : NetworkBehaviour
         //Debug.Log("Shoot " + (blank ? "fake" : "real") + " bullets");
         audioSource.PlayOneShot(audioSource.clip);
 
-        GameObject b = ObjectPool.getInstance().instanciate(bullet);
+        GameObject b = ObjectPool.Instance.instanciate(bullet);
         b.transform.position = muzzle.position;
         b.transform.rotation = muzzle.rotation;
         b.GetComponent<Projectile>().blank = !isRealAction;

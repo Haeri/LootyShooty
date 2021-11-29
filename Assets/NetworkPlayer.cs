@@ -20,7 +20,7 @@ public class NetworkPlayer : NetworkBehaviour
     {
         if (IsLocalPlayer)
         {
-            networkInfo = UIManager.getInstance().networkInfo.GetComponent<Text>();
+            networkInfo = UIManager.Instance.networkInfo.GetComponent<Text>();
         }
     }
 

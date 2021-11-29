@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using UnityEngine;
 
-public class ObjectPool : MonoBehaviour
+public class ObjectPool : Singleton<ObjectPool>
 {
     [System.Serializable]
     public struct PoolObject
@@ -20,20 +20,8 @@ public class ObjectPool : MonoBehaviour
 
     public List<PoolObject> poolPrefabs;
 
-    private static ObjectPool _instance;
     private Dictionary<GameObject, Ringbuffer> ringBufferMap;
 
-    private void Awake()
-    {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(this.gameObject);
-        }
-        else
-        {
-            _instance = this;
-        }
-    }
 
     void Start()
     {
@@ -59,11 +47,6 @@ public class ObjectPool : MonoBehaviour
 
             ringBufferMap.Add(item.prefab, rb);
         }
-    }
-
-    public static ObjectPool getInstance()
-    {
-        return _instance;
     }
 
     public GameObject instanciate(GameObject prefab)
