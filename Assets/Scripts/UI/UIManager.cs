@@ -13,7 +13,7 @@ public class UIManager : Singleton<UIManager>
 
     public void disconnect()
     {
-        ConnectionManager.Instance.Disconnect();
+        //ConnectionManager.Instance.Disconnect();
     }
 
 }

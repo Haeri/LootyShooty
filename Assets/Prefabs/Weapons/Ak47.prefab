@@ -28,6 +28,7 @@ Transform:
   m_LocalRotation: {x: -0.48181918, y: -0, z: -0, w: 0.8762707}
   m_LocalPosition: {x: 0, y: -0.028, z: -0.02}
   m_LocalScale: {x: 0.029352156, y: 0.03991549, z: 0.12626344}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3719545532102784864}
   m_RootOrder: 3
@@ -108,6 +109,7 @@ Transform:
   m_LocalRotation: {x: -0.55353475, y: 0.010069018, z: 0.8260171, w: 0.10580055}
   m_LocalPosition: {x: -0.0268, y: 0.0324, z: 0.2541}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4618532980307875493}
   m_RootOrder: 6
@@ -138,6 +140,7 @@ Transform:
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0.1445, z: -0.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4618532980307875493}
   m_RootOrder: 3
@@ -170,6 +173,7 @@ Transform:
   m_LocalRotation: {x: -0, y: 0.7096991, z: 0.704505, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 12.707553, y: 32.653713, z: 32.403637}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3980329424346904442}
   m_RootOrder: 1
@@ -250,6 +254,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6421933704743321226}
   - {fileID: 6364600733452554954}
@@ -286,6 +291,7 @@ Transform:
   m_LocalRotation: {x: -0.77015424, y: -0, z: -0, w: 0.6378578}
   m_LocalPosition: {x: 0.000070512295, y: -0.0428, z: 0.0029}
   m_LocalScale: {x: 0.035997484, y: 0.059925124, z: 0.14060697}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3980329424346904442}
   m_RootOrder: 0
@@ -366,6 +372,7 @@ Transform:
   m_LocalRotation: {x: 0.0013357892, y: -0.0032248804, z: -0.3826811, w: 0.92387396}
   m_LocalPosition: {x: 0.02, y: 0.1, z: 0.0122}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4618532980307875493}
   m_RootOrder: 4
@@ -398,6 +405,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1854701217118222865}
   - {fileID: 2543221862535331443}
@@ -459,6 +467,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.000070512295, y: -0.00982043, z: 0.1185542}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3980329424346904442}
   m_Father: {fileID: 4618532980307875493}
@@ -490,6 +499,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.0697, z: 0.584}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3272575607382783634}
   m_Father: {fileID: 4618532980307875493}
@@ -509,9 +519,8 @@ GameObject:
   - component: {fileID: 699847315505967078}
   - component: {fileID: 4622893964016796929}
   - component: {fileID: 7335110008172694954}
-  - component: {fileID: -5688932740382302455}
-  - component: {fileID: 4469339816535738637}
-  - component: {fileID: -8785614367543634509}
+  - component: {fileID: 2268189645233046113}
+  - component: {fileID: 6071328197916161400}
   m_Layer: 0
   m_Name: Ak47
   m_TagString: Untagged
@@ -529,6 +538,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3719545532102784864}
   - {fileID: 4709512191757220388}
@@ -677,6 +687,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6f3a4697afc86d42b4ee4f4284dbce4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 2268189645233046113}
+  _networkObjectCache: {fileID: 2268189645233046113}
   recoil: {x: -2, y: 0, z: 2}
   kickback: {x: 0, y: 0.04, z: -0.06}
   mouseRecoil: {x: 0.2, y: 0.4}
@@ -708,8 +721,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d8621e9c0b044541bf7b92aead65372, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 2268189645233046113}
+  _networkObjectCache: {fileID: 2268189645233046113}
   itemName: Ak47
---- !u!114 &-5688932740382302455
+--- !u!114 &2268189645233046113
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -718,14 +734,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 5820109237663546844}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 951099334
-  AlwaysReplicateAsRoot: 0
-  DontDestroyWithOwner: 1
-  AutoObjectParentSync: 1
---- !u!114 &4469339816535738637
+  _networkBehaviours:
+  - {fileID: 4622893964016796929}
+  - {fileID: 7335110008172694954}
+  - {fileID: 6071328197916161400}
+  SceneTransformProperties:
+    Position: {x: 0, y: 0, z: 0}
+    Rotation: {x: 0, y: 0, z: 0, w: 1}
+    LocalScale: {x: 1, y: 1, z: 1}
+  _isNetworked: 1
+  ChildNetworkObjects: []
+  NetworkObserver: {fileID: 0}
+  _prefabId: -1
+  _scenePathHash: 0
+  _sceneId: 0
+  _sceneNetworkObjects: []
+--- !u!114 &6071328197916161400
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -734,36 +761,38 @@ MonoBehaviour:
   m_GameObject: {fileID: 5820109237663546844}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
+  m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  SyncPositionX: 1
-  SyncPositionY: 1
-  SyncPositionZ: 1
-  SyncRotAngleX: 1
-  SyncRotAngleY: 1
-  SyncRotAngleZ: 1
-  SyncScaleX: 1
-  SyncScaleY: 1
-  SyncScaleZ: 1
-  PositionThreshold: 0.001
-  RotAngleThreshold: 0.01
-  ScaleThreshold: 0.01
-  InLocalSpace: 0
-  Interpolate: 1
-  CanCommitToTransform: 0
---- !u!114 &-8785614367543634509
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5820109237663546844}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6c0be61502bb534f922ebb746851216, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  _componentIndexCache: 2
+  _addedNetworkObject: {fileID: 2268189645233046113}
+  _networkObjectCache: {fileID: 2268189645233046113}
+  _synchronizeParent: 0
+  _packing:
+    Position: 1
+    Rotation: 1
+    Scale: 0
+  _interpolation: 2
+  _extrapolation: 0
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  _clientAuthoritative: 1
+  _sendToOwner: 1
+  _synchronizePosition: 1
+  _positionSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeRotation: 1
+  _rotationSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeScale: 1
+  _scaleSnapping:
+    X: 0
+    Y: 0
+    Z: 0
 --- !u!1 &5892123671958026618
 GameObject:
   m_ObjectHideFlags: 0
@@ -792,6 +821,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.05, z: 0.073}
   m_LocalScale: {x: 0.042222384, y: 0.087898284, z: 0.5275084}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3719545532102784864}
   m_RootOrder: 1
@@ -874,6 +904,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.067, z: 0.389}
   m_LocalScale: {x: 0.024257591, y: 0.037368197, z: 0.3315258}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3719545532102784864}
   m_RootOrder: 2
@@ -956,6 +987,7 @@ Transform:
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 0, y: 0, z: 0.0895}
   m_LocalScale: {x: 0.03, y: 0.1, z: 0.03}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4709512191757220388}
   m_RootOrder: 0

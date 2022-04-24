@@ -1,5 +1,5 @@
-﻿using Unity.Netcode;
-using UnityEngine;
+﻿using UnityEngine;
+using FishNet.Object;
 
 public class NetworkSingleton<T> : NetworkBehaviour
     where T : Component

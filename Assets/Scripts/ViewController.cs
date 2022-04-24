@@ -1,4 +1,5 @@
-﻿using Unity.Netcode;
+﻿using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -33,8 +34,10 @@ public class ViewController : NetworkBehaviour
     private Vector2 _recoil;
     private Vector2 _recoilReverse;
 
-    public NetworkVariable<bool> isAds = new NetworkVariable<bool>(/*new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly },*/ false);
-    public NetworkVariable<int> sightIndex = new NetworkVariable<int>(/*new NetworkVariableSettings { WritePermission = NetworkVariablePermission.OwnerOnly }, */ 0);
+    [SyncVar]
+    public bool isAds = false;
+    [SyncVar]
+    public int sightIndex = 0;
 
     private void Awake()
     {
@@ -51,7 +54,8 @@ public class ViewController : NetworkBehaviour
 
     void Start()
     {
-        if (IsLocalPlayer)
+
+        if (IsOwner)
         {
             inputMaster = new InputMaster();
             inputMaster.Player.Look.performed += ctx => lookInput = ctx.ReadValue<Vector2>();
@@ -70,7 +74,7 @@ public class ViewController : NetworkBehaviour
         float mouseY = 0;
 
        
-        if (IsLocalPlayer && Cursor.lockState == CursorLockMode.Locked)
+        if (IsOwner && Cursor.lockState == CursorLockMode.Locked)
         {
             mouseX = lookInput.x * mouseSensitivity.x * Time.deltaTime + _recoil.x;
             mouseY = lookInput.y * mouseSensitivity.y * Time.deltaTime + _recoil.y;
@@ -91,9 +95,9 @@ public class ViewController : NetworkBehaviour
         }
 
 
-        if (isAds.Value)
+        if (isAds)
         {
-            if (IsLocalPlayer)
+            if (IsOwner)
             {
                 holderTransform.localRotation = Quaternion.Euler(new Vector3(mouseY * gunSway.x, -mouseX * gunSway.y, -mouseX * gunSway.z)) * holderTransform.localRotation;
             }
@@ -105,7 +109,7 @@ public class ViewController : NetworkBehaviour
             if (_gun != null)
             {
                 int len = _gun.sights.Count;
-                int index = Math.Abs(sightIndex.Value % len);
+                int index = Math.Abs(sightIndex % len);
 
                 pos = _gun.sights[index].sightTransform.localPosition * -1;
                 rot = Quaternion.Inverse(_gun.sights[index].sightTransform.localRotation);
@@ -123,7 +127,7 @@ public class ViewController : NetworkBehaviour
             }
 
 
-            if (IsLocalPlayer && cam.fieldOfView != targetFOV)
+            if (IsOwner && cam.fieldOfView != targetFOV)
             {
                 cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFOV, Time.deltaTime * adsSpeed);
                 dofEffect.focalLength.value = Mathf.Lerp(dofEffect.focalLength.value, 50, Time.deltaTime * adsSpeed);
@@ -131,7 +135,7 @@ public class ViewController : NetworkBehaviour
         }
         else
         {
-            if (IsLocalPlayer)
+            if (IsOwner)
             {
                 holderTransform.localRotation = Quaternion.Euler(new Vector3(mouseY * gunSway.x, -mouseX * gunSway.y, -mouseX * gunSway.z)) * holderTransform.localRotation;
             }
@@ -145,7 +149,7 @@ public class ViewController : NetworkBehaviour
                 holderTransform.localPosition = Vector3.Lerp(holderTransform.localPosition, holderPosition, Time.deltaTime * recoverSpeed);
             }
 
-            if (IsLocalPlayer && cam.fieldOfView != initialFOV)
+            if (IsOwner && cam.fieldOfView != initialFOV)
             {
                 cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, initialFOV, Time.deltaTime * adsSpeed);
                 dofEffect.focalLength.value = Mathf.Lerp(dofEffect.focalLength.value, 1, Time.deltaTime * adsSpeed);
@@ -161,12 +165,12 @@ public class ViewController : NetworkBehaviour
     [ServerRpc]
     public void setADSServerRPC(bool ads)
     {
-        isAds.Value = ads;
+        isAds = ads;
     }
 
     public void cycleSight(float input)
     {
-        if (isAds.Value)
+        if (isAds)
         {
             cycleSightServerRPC(input);
         }
@@ -175,9 +179,9 @@ public class ViewController : NetworkBehaviour
     [ServerRpc]
     public void cycleSightServerRPC(float input)
     {
-        if (isAds.Value)
+        if (isAds)
         {
-            sightIndex.Value += Math.Sign(input);
+            sightIndex += Math.Sign(input);
         }
     }
 
@@ -201,13 +205,13 @@ public class ViewController : NetworkBehaviour
 
     private void OnEnable()
     {
-        if (!IsLocalPlayer) return;
+        if (!IsOwner) return;
 
         inputMaster.Enable();
     }
     private void OnDisable()
     {
-        if (!IsLocalPlayer) return;
+        if (!IsOwner) return;
 
         inputMaster.Disable();
     }

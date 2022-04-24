@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.Netcode;
+using FishNet.Object;
 
 public class Projectile : MonoBehaviour
 {
@@ -33,9 +33,9 @@ public class Projectile : MonoBehaviour
             if (!blank && !dmg.IsDead())
             {
                 damage = (int)(damage * multiplier);
-                Debug.Log($"Player({shooter.GetComponent<NetworkPlayer>().playerName.Value}) shot {dmg.name}. {dmg.health.Value}hp -> {dmg.health.Value - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
+                Debug.Log($"Player({shooter.GetComponent<NetworkPlayer>().playerName}) shot {dmg.name}. {dmg.health}hp -> {dmg.health - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
                 bool died = dmg.TakeDamage(damage);
-                shooter?.GetComponent<PlayerController>()?.enemyHitCallback(dmg.gameObject, damage, died);                
+                //shooter?.GetComponent<PlayerController>()?.enemyHitCallback(dmg.gameObject, damage, died);                
             }
 
             // Display hit FX

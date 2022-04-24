@@ -1,19 +1,21 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Netcode;
+using FishNet.Object;
 using UnityEngine.UI;
 using Unity.Collections;
 
 public class NetworkPlayer : NetworkBehaviour
 {
-    public NetworkVariable<FixedString32Bytes> playerName;
-    public NetworkVariable<int> ping;
+    public string playerName;
+    public int ping;
 
     private float nextActionTime = 0.0f;
     private float period = 0.1f;
 
     private Text networkInfo;
+
+#if false
 
     // Start is called before the first frame update
     void Start()
@@ -33,7 +35,7 @@ public class NetworkPlayer : NetworkBehaviour
             {
                 nextActionTime += period;
                 SendPingRequest();
-                networkInfo.text = playerName.Value + "\nPing " + ping.Value;
+                networkInfo.text = playerName + "\nPing " + ping;
             }
         }
     }
@@ -62,4 +64,5 @@ public class NetworkPlayer : NetworkBehaviour
         //ping.Value = (int)(Time.time - PingStart);
     }
 
+#endif
 }

@@ -1,13 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Netcode;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using System;
 
 public class Damagable : NetworkBehaviour
 {
     public int maxHealth = 100;
-    public NetworkVariable<int> health = new NetworkVariable<int>(100);
+    [SyncVar]
+    public int health = 100;
 
     public GameObject hitEffect;
     public bool isPenetrable;
@@ -17,22 +19,22 @@ public class Damagable : NetworkBehaviour
 
     public bool IsDead()
     {
-        return health.Value <= 0;
+        return health <= 0;
     }
 
     public bool TakeDamage(int amount)
     {
-        if (health.Value == 0)
+        if (health == 0)
         {
             return false;
         }
 
-        health.Value -= amount;
+        health -= amount;
         OnDamage?.Invoke(amount);
         
-        if(health.Value < 0)
+        if(health < 0)
         {
-            health.Value = 0;
+            health = 0;
             OnDeath?.Invoke();
             return true;
         }
@@ -42,7 +44,7 @@ public class Damagable : NetworkBehaviour
 
     public void ResetHealth()
     {
-        health.Value = maxHealth;   
+        health = maxHealth;   
     }
 
 }

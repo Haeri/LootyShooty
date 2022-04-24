@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Netcode;
+using FishNet.Object;
 
 [RequireComponent(typeof(AudioSource))]
 [RequireComponent(typeof(BoxCollider))]
@@ -86,7 +86,7 @@ public class Gun : NetworkBehaviour
     public void Shoot()
     {
         // Perform action on server
-        ShootServerRpc(OwnerClientId);
+        ShootServerRpc(0);
 
         // Dont perform action on the host, as Host is also server
         if (!IsServer)
@@ -154,11 +154,11 @@ public class Gun : NetworkBehaviour
         }
     }
 
-    [ClientRpc]
+    [ObserversRpc(IncludeOwner = false)]
     private void ShootClientRpc(ulong shooter)
     {
         // Replicate shooting on all clients except for the original one
-        if (shooter != NetworkManager.LocalClientId)
+        //if (shooter != NetworkManager.LocalClientId)
         {   
             ShootAction(false);
         }
@@ -166,7 +166,7 @@ public class Gun : NetworkBehaviour
 
     public void Reload()
     {
-        ReloadServerRPC(OwnerClientId);
+        ReloadServerRPC(0);
 
         if (!IsServer)
         {
@@ -202,10 +202,10 @@ public class Gun : NetworkBehaviour
         ReloadClientRPC(initialtor);
     }
 
-    [ClientRpc]
+    [ObserversRpc(IncludeOwner = false)]
     private void ReloadClientRPC(ulong initialtor)
     {
-        if (initialtor != NetworkManager.LocalClientId)
+        //if (initialtor != NetworkManager.LocalClientId)
         {
             ReloadAction(false);
         }

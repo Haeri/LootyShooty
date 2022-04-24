@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using Unity.Netcode;
+using FishNet.Object;
 using System.Collections.Generic;
 using System.Text;
-using Unity.Netcode.Transports.UNET;
 
+
+#if false
 public class ConnectionManager : NetworkSingleton<ConnectionManager>
 {
     public string defaultIP = "127.0.0.1";
@@ -163,3 +164,4 @@ public class ConnectionManager : NetworkSingleton<ConnectionManager>
         SceneManager.LoadScene("MainMenu");
     }
 }
+#endif

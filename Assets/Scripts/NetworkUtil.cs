@@ -9,15 +9,15 @@ public class NetworkUtil : MonoBehaviour
 
     public void StartClient()
     {
-        ConnectionManager.Instance.startupClient(ip.text.Trim(), int.Parse(port.text.Trim()), playerName.text.Trim());
+        //ConnectionManager.Instance.startupClient(ip.text.Trim(), int.Parse(port.text.Trim()), playerName.text.Trim());
     }
     public void StartHost()
     {
-        ConnectionManager.Instance.startupHost(ip.text.Trim(), int.Parse(port.text.Trim()), playerName.text.Trim());
+        //ConnectionManager.Instance.startupHost(ip.text.Trim(), int.Parse(port.text.Trim()), playerName.text.Trim());
     }
 
     public void StartServer()
     {
-        ConnectionManager.Instance.startupServer(ip.text.Trim(), int.Parse(port.text.Trim()));
+        //ConnectionManager.Instance.startupServer(ip.text.Trim(), int.Parse(port.text.Trim()));
     }
 }
