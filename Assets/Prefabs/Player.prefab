@@ -2467,6 +2467,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 5620044902323759442}
   _networkObjectCache: {fileID: 5620044902323759442}
   _moveRate: 5
+  cam: {fileID: 4937619769058388379}
 --- !u!1 &4937619768197937070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2521,7 +2522,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &4937619769058388382
 Transform:
   m_ObjectHideFlags: 0

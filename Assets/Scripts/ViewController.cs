@@ -205,7 +205,7 @@ public class ViewController : NetworkBehaviour
 
     private void OnEnable()
     {
-        if (!IsOwner) return;
+        if (inputMaster == null || !IsOwner) return;
 
         inputMaster.Enable();
     }

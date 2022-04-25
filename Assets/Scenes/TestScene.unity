@@ -5682,11 +5682,11 @@ MonoBehaviour:
   _scenePathHash: 2123469738
   _sceneId: 9120233080608168507
   _sceneNetworkObjects:
-  - {fileID: 767110364}
   - {fileID: 546979700}
-  - {fileID: 1763156988}
-  - {fileID: 1701835747}
+  - {fileID: 767110364}
   - {fileID: 1492353893}
+  - {fileID: 1701835747}
+  - {fileID: 1763156988}
 --- !u!1 &1502670696
 GameObject:
   m_ObjectHideFlags: 0
