@@ -2475,11 +2475,13 @@ MonoBehaviour:
   jumpHeight: 2
   mass: 4
   maxJumpCount: 2
-  _cam: {fileID: 4937619769058388379}
-  _viewController: {fileID: 0}
-  _gunHolder: {fileID: 0}
-  _bones_root: {fileID: 0}
+  maxPickupDistance: 5
+  _cameraObject: {fileID: 4937619769058388379}
+  _viewController: {fileID: 4937619769058388383}
+  _gunHolder: {fileID: 4937619768197937070}
   _graphics: {fileID: 1756531788443174782}
+  _itemText: {fileID: 0}
+  _itemTextPanel: {fileID: 0}
 --- !u!1 &4937619768197937070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2626,6 +2628,7 @@ MonoBehaviour:
   adsSpeed: 3
   isAds: 0
   sightIndex: 0
+  _characterController: {fileID: 7052732698507762}
 --- !u!114 &4937619769058388380
 MonoBehaviour:
   m_ObjectHideFlags: 0

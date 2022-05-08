@@ -39,6 +39,14 @@ public class ViewController : NetworkBehaviour
     [SyncVar]
     public int sightIndex = 0;
 
+
+
+
+    [SerializeField] private FishController _characterController;
+
+
+
+
     private void Awake()
     {
         holderTransform = transform.GetChild(0);
@@ -85,7 +93,8 @@ public class ViewController : NetworkBehaviour
             xRotation = Mathf.Clamp(xRotation, -90.0f, 90.0f);
 
             transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
-            playerTransform.Rotate(Vector3.up * mouseX);
+            //playerTransform.Rotate(Vector3.up * mouseX);
+            _characterController.Rotate(mouseX);
         }
 
         if (_recoilReverse != Vector2.zero)
