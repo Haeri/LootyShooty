@@ -419,7 +419,7 @@ CharacterJoint:
   m_Anchor: {x: 0, y: 0, z: 0}
   m_Axis: {x: 0, y: 0, z: 1}
   m_AutoConfigureConnectedAnchor: 1
-  m_ConnectedAnchor: {x: 0.2784152, y: -0.00000031073773, z: 0.00000011362136}
+  m_ConnectedAnchor: {x: 0.2784152, y: -0.00000041504586, z: 0.00000012107195}
   serializedVersion: 2
   m_SwingAxis: {x: 0, y: 1, z: 0}
   m_TwistLimitSpring:
@@ -545,7 +545,7 @@ CharacterJoint:
   m_Anchor: {x: 0, y: 0, z: 0}
   m_Axis: {x: 0, y: 1, z: 0}
   m_AutoConfigureConnectedAnchor: 1
-  m_ConnectedAnchor: {x: -0.15162817, y: 0.2960487, z: -0.0723433}
+  m_ConnectedAnchor: {x: -0.15162809, y: 0.29604846, z: -0.07234432}
   serializedVersion: 2
   m_SwingAxis: {x: 0, y: 0, z: 1}
   m_TwistLimitSpring:
@@ -673,7 +673,7 @@ CharacterJoint:
   m_Anchor: {x: 0, y: 0, z: 0}
   m_Axis: {x: 1, y: 0, z: 0}
   m_AutoConfigureConnectedAnchor: 1
-  m_ConnectedAnchor: {x: -0.0000000080688665, y: 0.4547301, z: -0.032053817}
+  m_ConnectedAnchor: {x: 0.00000012446753, y: 0.45472997, z: -0.032055672}
   serializedVersion: 2
   m_SwingAxis: {x: 0, y: 0, z: 1}
   m_TwistLimitSpring:
@@ -2104,7 +2104,7 @@ CharacterJoint:
   m_Anchor: {x: 0, y: 0, z: 0}
   m_Axis: {x: 0, y: 0, z: 1}
   m_AutoConfigureConnectedAnchor: 1
-  m_ConnectedAnchor: {x: -0.2784152, y: -0.00000085369646, z: 0.00000037625432}
+  m_ConnectedAnchor: {x: -0.2784152, y: -0.00000092820227, z: 0.0000003837049}
   serializedVersion: 2
   m_SwingAxis: {x: 0, y: 1, z: 0}
   m_TwistLimitSpring:
@@ -2396,9 +2396,9 @@ MonoBehaviour:
   - {fileID: 4937619767263221164}
   - {fileID: 7725846585032129984}
   - {fileID: 145357129828407903}
-  - {fileID: 0}
   - {fileID: 7052732698507762}
   - {fileID: 4937619769058388383}
+  - {fileID: 969457388967174168}
   SceneTransformProperties:
     Position: {x: 0, y: 0, z: 0}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
@@ -2406,7 +2406,7 @@ MonoBehaviour:
   _isNetworked: 1
   ChildNetworkObjects: []
   NetworkObserver: {fileID: 0}
-  _prefabId: -1
+  _prefabId: 4
   _scenePathHash: 0
   _sceneId: 0
   _sceneNetworkObjects: []
@@ -2434,8 +2434,8 @@ MonoBehaviour:
   _extrapolation: 0
   _enableTeleport: 0
   _teleportThreshold: 1
-  _clientAuthoritative: 1
-  _sendToOwner: 1
+  _clientAuthoritative: 0
+  _sendToOwner: 0
   _synchronizePosition: 1
   _positionSnapping:
     X: 0
@@ -2446,7 +2446,7 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
-  _synchronizeScale: 1
+  _synchronizeScale: 0
   _scaleSnapping:
     X: 0
     Y: 0
@@ -2463,11 +2463,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 14313a83ee464dd4c8b4d875fe88d02d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 5
+  _componentIndexCache: 4
   _addedNetworkObject: {fileID: 5620044902323759442}
   _networkObjectCache: {fileID: 5620044902323759442}
-  _moveRate: 5
-  cam: {fileID: 4937619769058388379}
+  maxSpeed: 5
+  maxShiftSpeed: 8
+  accelerationTime: 0.1
+  decelerationTime: 0.1
+  airAccelerationTime: 0.4
+  airDecelerationTime: 3
+  jumpHeight: 2
+  mass: 4
+  maxJumpCount: 2
+  _cam: {fileID: 4937619769058388379}
+  _viewController: {fileID: 0}
+  _gunHolder: {fileID: 0}
+  _bones_root: {fileID: 0}
+  _graphics: {fileID: 1756531788443174782}
 --- !u!1 &4937619768197937070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2602,7 +2614,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aeec95c42469ede449a0720c3bb27857, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 6
+  _componentIndexCache: 5
   _addedNetworkObject: {fileID: 5620044902323759442}
   _networkObjectCache: {fileID: 5620044902323759442}
   mouseSensitivity: {x: 5, y: 5}
@@ -4061,7 +4073,7 @@ CharacterJoint:
   m_Anchor: {x: 0, y: 0, z: 0}
   m_Axis: {x: 0, y: 1, z: 0}
   m_AutoConfigureConnectedAnchor: 1
-  m_ConnectedAnchor: {x: 0.15162814, y: 0.29604846, z: -0.072343364}
+  m_ConnectedAnchor: {x: 0.15162821, y: 0.296048, z: -0.07234439}
   serializedVersion: 2
   m_SwingAxis: {x: 0, y: 0, z: 1}
   m_TwistLimitSpring:
@@ -4120,6 +4132,7 @@ GameObject:
   - component: {fileID: 8253160903567023666}
   - component: {fileID: 3521756241102185174}
   - component: {fileID: 1565490545}
+  - component: {fileID: 969457388967174168}
   m_Layer: 0
   m_Name: Graphic
   m_TagString: Untagged
@@ -4182,6 +4195,22 @@ MonoBehaviour:
   - m_Rig: {fileID: 323788837}
     m_Active: 1
   m_Effectors: []
+--- !u!114 &969457388967174168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8773802286929495176}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37c39a68e17740c4ea2b1fb940e5cd53, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 6
+  _addedNetworkObject: {fileID: 5620044902323759442}
+  _networkObjectCache: {fileID: 5620044902323759442}
+  _smoothingDuration: 0.125
 --- !u!1 &8792900025904572371
 GameObject:
   m_ObjectHideFlags: 0
