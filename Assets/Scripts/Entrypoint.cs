@@ -33,7 +33,7 @@ public class Entrypoint : MonoBehaviour
                 WriteDefaultConfig();
             }
 
-            //ConnectionManager.Instance.startupServer(cfg.ip, cfg.port);
+            ConnectionManager.Instance.StartupServer(cfg.ip, cfg.port);
         }
     }
 

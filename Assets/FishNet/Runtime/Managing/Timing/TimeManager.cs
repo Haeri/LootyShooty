@@ -120,6 +120,10 @@ namespace FishNet.Managing.Timing
         [HideInInspector]
         public double TickDelta { get; private set; }
         /// <summary>
+        /// True if the TimeManager will or has ticked this frame.
+        /// </summary>
+        public bool FrameTicked { get; private set; }
+        /// <summary>
         /// How long the local server has been connected.
         /// </summary>
         public float ServerUptime { get; private set; }
@@ -302,7 +306,6 @@ namespace FishNet.Managing.Timing
         {
             if (_networkManager.IsServer)
                 ServerUptime += Time.deltaTime;
-
             if (_networkManager.IsClient)
                 ClientUptime += Time.deltaTime;
 
@@ -593,6 +596,7 @@ namespace FishNet.Managing.Timing
             double time = Time.deltaTime;
             _elapsedTickTime += time;
 
+            FrameTicked = (_elapsedTickTime >= timePerSimulation);
             bool isClient = _networkManager.IsClient;
             while (_elapsedTickTime >= timePerSimulation)
             {
@@ -621,13 +625,14 @@ namespace FishNet.Managing.Timing
                 if (isClient && (_elapsedTickTime < timePerSimulation))
                     TrySendPing(LocalTick + 1);
 
+                if (_networkManager.IsServer)
+                    SendTimingAdjustment();
+
                 //Send out data.
                 TryIterateData(false);
 
                 if (_networkManager.IsClient)
                     _clientTicks++;
-                if (_networkManager.IsServer)
-                    SendTimingAdjustment();
 
                 Tick++;
                 LocalTick++;
@@ -804,15 +809,19 @@ namespace FishNet.Managing.Timing
                 /* This will be true if to iterate first first
                  * resulting in the first TransportManager.Iterate
                  * being called for server, and the second for client. */
-                bool a = (_networkManager.IncomingIterationOrder == NetworkManager.HostIterationOrder.ServerFirst);
-                _networkManager.TransportManager.IterateIncoming(a);
-                _networkManager.TransportManager.IterateIncoming(!a);
+                //bool a = (_networkManager.IncomingIterationOrder == NetworkManager.HostIterationOrder.ServerFirst);
+                //_networkManager.TransportManager.IterateIncoming(a);
+                //_networkManager.TransportManager.IterateIncoming(!a);
+                _networkManager.TransportManager.IterateIncoming(true);
+                _networkManager.TransportManager.IterateIncoming(false);
             }
             else
             {
-                bool a = (_networkManager.OutgoingIterationOrder == NetworkManager.HostIterationOrder.ServerFirst);
-                _networkManager.TransportManager.IterateOutgoing(a);
-                _networkManager.TransportManager.IterateOutgoing(!a);
+                //bool a = (_networkManager.OutgoingIterationOrder == NetworkManager.HostIterationOrder.ServerFirst);
+                //_networkManager.TransportManager.IterateOutgoing(a);
+                //_networkManager.TransportManager.IterateOutgoing(!a);
+                _networkManager.TransportManager.IterateOutgoing(true);
+                _networkManager.TransportManager.IterateOutgoing(false);
             }
         }
 

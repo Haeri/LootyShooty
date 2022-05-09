@@ -1,7 +1,9 @@
 name: Builder
 on:
   push:
-    branches: [ main ]
+    branches: 
+    - main
+    - fishnet
 
   workflow_dispatch:
 

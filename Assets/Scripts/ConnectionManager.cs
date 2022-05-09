@@ -3,165 +3,56 @@ using UnityEngine.SceneManagement;
 using FishNet.Object;
 using System.Collections.Generic;
 using System.Text;
+using FishNet;
 
-
-#if false
-public class ConnectionManager : NetworkSingleton<ConnectionManager>
+public class ConnectionManager : MonoBehaviour
 {
+    public static ConnectionManager Instance { get; private set; }
+
     public string defaultIP = "127.0.0.1";
     public int defaultPort = 7777;
-    public GameObject playerPrefab;
-    public GameObject spectatorCamera;
 
-    public struct ConnectionPayload
+    private void Awake()
     {
-        public string name;
+        Instance = this;
     }
 
-    public struct PlayerData
+    public void StartupClient()
     {
-        public string name;
+        StartupClient(defaultIP, defaultPort);
     }
-
-    private Dictionary<ulong, PlayerData> clientData;
-
-
-    private void Start()
+    public void StartupClient(string ip, int port, string name = "")
     {
-        //NetworkManager.Singleton.OnServerStarted += HandleServerStarted;
-        //NetworkManager.Singleton.OnClientConnectedCallback += HandleClientConnected;
-        NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnect;
-        NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-    }
-
-    private void spawnPlayer(ulong clientID, string name)
-    {
-        GameObject go = Instantiate(playerPrefab, new Vector3(0, 5, 0), Quaternion.identity);
-        go.name = name;
-        go.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientID);
-        go.GetComponent<NetworkPlayer>().playerName.Value = "Player_"+name;
-        Debug.Log($"Spawned Player {name} ID:[{clientID}]");
-    }
-
-    public void startupClient()
-    {
-        startupClient(defaultIP, defaultPort);
-    }
-    public void startupClient(string ip, int port, string name = "")
-    {
-        SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
-        {
-            var payload = JsonUtility.ToJson(new ConnectionPayload()
-            {
-                name = name
-            });
-
-            byte[] payloadBytes = Encoding.ASCII.GetBytes(payload);
-
-            NetworkManager.Singleton.NetworkConfig.ConnectionData = payloadBytes;
-            NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
-            NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = port;
-            NetworkManager.Singleton.StartClient();
-        };
+        InstanceFinder.TransportManager.Transport.SetServerBindAddress(ip, FishNet.Transporting.IPAddressType.IPv4);
+        InstanceFinder.TransportManager.Transport.SetPort((ushort)port);
+        InstanceFinder.ClientManager.StartConnection();
     }
     
-    public void startupHost()
+    public void StartupHost()
     {
-        startupHost(defaultIP, defaultPort);
+        StartupHost(defaultIP, defaultPort);
     }
-    public void startupHost(string ip, int port, string name = "")
+    public void StartupHost(string ip, int port, string name = "")
     {
-        SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
-        {
-            var payload = JsonUtility.ToJson(new ConnectionPayload()
-            {
-                name = name
-            });
-
-            byte[] payloadBytes = Encoding.ASCII.GetBytes(payload);
-
-            NetworkManager.Singleton.NetworkConfig.ConnectionData = payloadBytes;
-            NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
-            NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
-            NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
-            NetworkManager.Singleton.StartHost();
-           
-            /*
-            if (name == "")
-            {
-                name = "Host_" + NetworkManager.Singleton.LocalClientId;
-            }
-            spawnPlayer(NetworkManager.Singleton.LocalClientId, name);
-           */
-        };
+        InstanceFinder.TransportManager.Transport.SetServerBindAddress(ip, FishNet.Transporting.IPAddressType.IPv4);
+        InstanceFinder.TransportManager.Transport.SetPort((ushort)port);
+        InstanceFinder.ServerManager.StartConnection();
+        InstanceFinder.ClientManager.StartConnection();
     }
 
-    public void startupServer()
+    public void StartupServer()
     {
-        startupServer(defaultIP, defaultPort);
+        StartupServer(defaultIP, defaultPort);
     }
-    public void startupServer(string ip, int port)
+    public void StartupServer(string ip, int port)
     {
-        SceneManager.LoadSceneAsync("TestScene").completed += (op) =>
-        {
-            NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
-            NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = ip;
-            NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = port;
-            NetworkManager.Singleton.StartServer();
-        };
-    }
-
-
-    private void HandleClientConnected(ulong clientId)
-    {
-        if (IsServer)
-        {
-            //spawnPlayer(clientId, "PETER");
-            /*
-            return;
-            SetSeedClientRPC(Random.seed, new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams
-                {
-                    TargetClientIds = new ulong[] { clientId }
-                }
-            });
-            */
-        }
-    }
-
-    [ClientRpc]
-    private void SetSeedClientRPC(int seed, ClientRpcParams clientRpcParams = default)
-    {
-        Random.InitState(seed);
-    }
-
-    private void HandleClientDisconnect(ulong clientId)
-    {
-        if (IsServer)
-        {
-            
-            foreach (ulong key in NetworkManager.Singleton.ConnectedClients.Keys)
-            {
-                Debug.Log("Dict: "+  key);
-            }
-            Debug.Log("client: " + clientId);
-            //NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject.GetComponent<PlayerController>().DropItem();
-        }
-    }
-
-    private void ApprovalCheck(byte[] connectionData, ulong clientId, NetworkManager.ConnectionApprovedDelegate callback)
-    {
-        string payload = Encoding.ASCII.GetString(connectionData);
-        var connectionPayload = JsonUtility.FromJson<ConnectionPayload>(payload);      
-        //spawnPlayer(clientId, connectionPayload.name);
-        callback(true, null, true, null, null);
+        InstanceFinder.TransportManager.Transport.SetServerBindAddress(ip, FishNet.Transporting.IPAddressType.IPv4);
+        InstanceFinder.TransportManager.Transport.SetPort((ushort)port);
+        InstanceFinder.ServerManager.StartConnection();
     }
 
     public void Disconnect()
     {
-        NetworkManager.Singleton.Shutdown();      
-        SceneManager.LoadScene("MainMenu");
+        
     }
 }
-#endif

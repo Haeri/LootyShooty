@@ -3,7 +3,6 @@ using FishNet.Object;
 using FishNet.Object.Prediction;
 using UnityEngine;
 
-
 /*
 * 
 * See TransformPrediction.cs for more detailed notes.
@@ -40,14 +39,14 @@ namespace FishNet.Example.Prediction.CharacterControllers
 
         #region Private.
         private CharacterController _characterController;
-        private MoveData _clientMoveData;       
+        private MoveData _clientMoveData;
         #endregion
 
         private void Awake()
         {
             InstanceFinder.TimeManager.OnTick += TimeManager_OnTick;
             InstanceFinder.TimeManager.OnUpdate += TimeManager_OnUpdate;
-            _characterController = GetComponent<CharacterController>();            
+            _characterController = GetComponent<CharacterController>();
         }
 
         public override void OnStartClient()

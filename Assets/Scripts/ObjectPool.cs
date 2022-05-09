@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Data;
 using UnityEngine;
 
-public class ObjectPool : Singleton<ObjectPool>
+public class ObjectPool : MonoBehaviour
 {
+    public static ObjectPool Instance { get; private set; }
+
     [System.Serializable]
     public struct PoolObject
     {
@@ -22,6 +24,10 @@ public class ObjectPool : Singleton<ObjectPool>
 
     private Dictionary<GameObject, Ringbuffer> ringBufferMap;
 
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {

@@ -1,6 +1,7 @@
 using FishNet;
 using FishNet.Object;
 using FishNet.Object.Prediction;
+using FishNet.Component.Transforming;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -61,23 +62,23 @@ public class FishController : NetworkBehaviour
 
     [Header("References")]
     [SerializeField] private GameObject _cameraObject;
-    [SerializeField] private ViewController _viewController;
+    [SerializeField] private GameObject _cameraRoot;    
     [SerializeField] private GameObject _gunHolder;
-
     [SerializeField] private GameObject _graphics;
-
-    [SerializeField] private Text _itemText;
-    [SerializeField] private GameObject _itemTextPanel;
-
-
-
-
     #endregion
 
     #region Private.
+    // References
     private CharacterController _characterController;
     private MoveData _clientMoveData;
     private InputMaster _inputMaster;
+    private ViewController _viewController;
+
+
+    private Text _itemText;
+    private GameObject _itemTextPanel;
+
+
     private Vector2 _moveInput;
     private bool _sprintInput;
     private bool _jumpInput;
@@ -85,7 +86,7 @@ public class FishController : NetworkBehaviour
     private Gun _gun;
 
 
-    private bool _isShooting;
+    //private bool _isShooting;
 
     private Vector3 _velocity = new Vector3(0, 0, 0);
     private Vector3 _acceleration = new Vector3(0, 0, 0);
@@ -107,6 +108,9 @@ public class FishController : NetworkBehaviour
 
     private void Awake()
     {
+        _viewController = GetComponent<ViewController>();
+        _characterController = GetComponent<CharacterController>();
+
         _accelerationStrength = maxSpeed / accelerationTime;
         _decelerationStrength = -maxSpeed / decelerationTime;
         _airAccelerationStrength = maxSpeed / airAccelerationTime;
@@ -114,7 +118,7 @@ public class FishController : NetworkBehaviour
 
         InstanceFinder.TimeManager.OnTick += TimeManager_OnTick;
         InstanceFinder.TimeManager.OnUpdate += TimeManager_OnUpdate;
-        _characterController = GetComponent<CharacterController>();
+        
 
         foreach (Collider c in _graphics.GetComponentsInChildren<Collider>())
         {
@@ -129,31 +133,32 @@ public class FishController : NetworkBehaviour
         }
 
         toggleRagdoll(false);
-
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
 
-        _characterController.enabled = (base.IsServer || base.IsOwner);
-        _cameraObject.SetActive(IsOwner);
+        _characterController.enabled = (base.IsServer || base.IsOwner);        
 
         if (IsOwner)
         {
+            LevelRefs.Instance.LevelCamera.SetActive(false);
+            _cameraObject.SetActive(true);
+
             _inputMaster = new InputMaster();
             _inputMaster.Player.Move.performed += ctx => _moveInput = ctx.ReadValue<Vector2>();
             _inputMaster.Player.Sprint.started += ctx => _sprintInput = true;
             _inputMaster.Player.Sprint.canceled += ctx => _sprintInput = false;
             _inputMaster.Player.Jump.performed += ctx => _jumpInput = true;
             //_inputMaster.Player.Reload.performed += ctx => Reload();
-            _inputMaster.Player.Fire.started += ctx => _isShooting = true;
-            _inputMaster.Player.Fire.canceled += ctx => _isShooting = false;
+            //_inputMaster.Player.Fire.started += ctx => _isShooting = true;
+            //_inputMaster.Player.Fire.canceled += ctx => _isShooting = false;
             //_inputMaster.Player.ADS.started += ctx => doAds(true);
             //_inputMaster.Player.ADS.canceled += ctx => doAds(false);
             //_inputMaster.Player.CycleSight.performed += ctx => cycleSight(ctx.ReadValue<float>());
-            //_inputMaster.Player.Drop.performed += ctx => DropItem();
-            _inputMaster.Player.Take.performed += ctx => pickupItem();
+            _inputMaster.Player.Drop.performed += ctx => DropItemServerRpc();
+            _inputMaster.Player.Take.performed += ctx => PckupItemServerRPC();
             _inputMaster.Enable();
 
             _graphics.SetActive(false);
@@ -192,7 +197,10 @@ public class FishController : NetworkBehaviour
     private void TimeManager_OnUpdate()
     {
         if (base.IsOwner)
+        {
+            itemPickupCheck();
             MoveWithData(_clientMoveData, Time.deltaTime);
+        }
     }
 
     private void CheckInput(out MoveData md)
@@ -391,20 +399,65 @@ public class FishController : NetworkBehaviour
         return null;
     }
 
-    private void equipItem(Gun newGun)
+
+    private void DropItemAction()
     {
-        // Pick up new gun
-        newGun.transform.parent = _gunHolder.transform;
-        newGun.transform.localPosition = Vector3.zero;
-        newGun.transform.localRotation = Quaternion.identity;
+        _gun.transform.parent = null;
+        _gun.SetEquiped(false);
+        //if (IsServer)
+        {
+            _gun.GetComponent<Rigidbody>().AddForce(transform.forward * 150);
+        }
+
+        _gun = null;
+        _viewController.EquipGun(null);
+
+        //right_hand_ik.weight = 0;
+        //left_hand_ik.weight = 0;
+    }
+
+    [ServerRpc]
+    private void DropItemServerRpc()
+    {
+        if (_gun != null)
+        {
+            _gun.GetComponent<NetworkObject>().RemoveOwnership();
+            if (IsServerOnly) { 
+                DropItemAction();
+        }
+            DropItemClientRpc();
+        }
+    }
+
+    [ObserversRpc(IncludeOwner = true, BufferLast = true)]
+    private void DropItemClientRpc()
+    {
+   
+            DropItemAction();
+        
+    }
+
+
+
+    private void EquipItemAction(Gun newGun)
+    {
         if (IsServer)
         {
-            newGun.GetComponent<Rigidbody>().isKinematic = true;
+            Debug.Log("Server Equip Gun");
         }
-        newGun.GetComponent<BoxCollider>().enabled = false;
-        //newGun.GetComponent<NetworkTransform>().enabled = false;
+        else {
+            Debug.Log("Equip Gun");
+        }
 
         _gun = newGun;
+
+        // Pick up new gun
+        _gun.transform.parent = _gunHolder.transform;
+        _gun.transform.localPosition = Vector3.zero;
+        _gun.transform.localRotation = Quaternion.identity;
+
+        _gun.SetEquiped(true);
+
         _viewController.EquipGun(_gun);
 
         //left_arm_target.localPosition = _gun.handle.localPosition;
@@ -414,9 +467,9 @@ public class FishController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void pickupItem()
+    private void PckupItemServerRPC()
     {
-        Debug.Log(Owner);
+        //Debug.Log(Owner);
         // Check if there is anything infront
         GameObject go = itemPickupCheck();
         if (go == null) return;
@@ -426,26 +479,27 @@ public class FishController : NetworkBehaviour
         if (newGun != null)
         {
             // Chech if we already have a gun
-            //if (_gun != null) DropItemServerRpc();
+            if (_gun != null) DropItemServerRpc();
 
             NetworkObject nob = newGun.GetComponent<NetworkObject>();
             nob.GiveOwnership(base.Owner);
 
-            //if (!IsHost)
+            if (IsServerOnly)
             {
-                //equipItem(newGun);
+                Debug.Log("Equip Item Call on Server");
+                EquipItemAction(newGun);
             }
-            equipItemClientRpc(newGun.GetComponent<NetworkObject>().ObjectId);
+            EquipItemClientRpc(newGun.GetComponent<NetworkObject>().ObjectId);
         }
     }
 
     [ObserversRpc(IncludeOwner = true, BufferLast = true)]
-    private void equipItemClientRpc(int ObjectId)
+    private void EquipItemClientRpc(int ObjectId)
     {
-        NetworkObject no = InstanceFinder.ServerManager.Objects.Spawned[ObjectId];
+        NetworkObject no = InstanceFinder.ClientManager.Objects.Spawned[ObjectId];
         Gun newGun = no.gameObject.GetComponent<Gun>();
 
-        equipItem(newGun);
+        EquipItemAction(newGun);
     }
 
     private void toggleRagdoll(bool toggle)

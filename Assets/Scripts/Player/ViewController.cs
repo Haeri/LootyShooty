@@ -15,7 +15,9 @@ public class ViewController : NetworkBehaviour
     public float recoilRevoverSpeed = 3;
     public float variance = 0.4f;
 
-    private Transform playerTransform;
+    //private Transform playerTransform;
+    [SerializeField] private GameObject _cameraObject;
+    [SerializeField] private GameObject _cameraRoot;
 
     private float xRotation = 0.0f;
     private InputMaster inputMaster;
@@ -42,7 +44,7 @@ public class ViewController : NetworkBehaviour
 
 
 
-    [SerializeField] private FishController _characterController;
+    private FishController _characterController;
 
 
 
@@ -53,15 +55,18 @@ public class ViewController : NetworkBehaviour
         holderPosition = holderTransform.localPosition;
         holderRotation = holderTransform.localRotation;
 
-        cam = GetComponent<Camera>();
+        cam = _cameraObject.GetComponent<Camera>();
         initialFOV = cam.fieldOfView;
 
-        volume = GetComponent<Volume>();
+        volume = _cameraObject.GetComponent<Volume>();
         volume.profile.TryGet(out dofEffect);
+
+        _characterController = GetComponent<FishController>();
     }
 
-    void Start()
+    public override void OnStartClient()
     {
+        base.OnStartClient();
 
         if (IsOwner)
         {
@@ -73,7 +78,7 @@ public class ViewController : NetworkBehaviour
             Cursor.lockState = CursorLockMode.Locked;
         }
 
-        playerTransform = transform.parent.GetComponent<Transform>();
+        //playerTransform = transform.parent.GetComponent<Transform>();
     }
 
     void Update()
@@ -92,7 +97,7 @@ public class ViewController : NetworkBehaviour
             xRotation -= mouseY;
             xRotation = Mathf.Clamp(xRotation, -90.0f, 90.0f);
 
-            transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
+            _cameraRoot.transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
             //playerTransform.Rotate(Vector3.up * mouseX);
             _characterController.Rotate(mouseX);
         }

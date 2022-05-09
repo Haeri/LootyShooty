@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using FishNet.Object;
+using FishNet.Component.Transforming;
 
 [RequireComponent(typeof(AudioSource))]
 [RequireComponent(typeof(BoxCollider))]
@@ -31,7 +32,7 @@ public class Gun : NetworkBehaviour
     public Transform mag;
     public Transform handle;
 
-    private AudioSource audioSource;
+    private AudioSource _audioSource;
     
     public List<Sight> sights = new List<Sight>();
 
@@ -46,7 +47,7 @@ public class Gun : NetworkBehaviour
 
     void Start()
     {
-        audioSource = GetComponent<AudioSource>();
+        _audioSource = GetComponent<AudioSource>();
     }
 
     void Update()
@@ -83,6 +84,16 @@ public class Gun : NetworkBehaviour
         }
     }
 
+    public void SetEquiped(bool equiped)
+    {
+        if (IsServer)
+        {
+            GetComponent<Rigidbody>().isKinematic = equiped;
+        }
+        GetComponent<BoxCollider>().enabled = !equiped;
+        GetComponent<NetworkTransform>().enabled = !equiped;
+    }
+
     public void Shoot()
     {
         // Perform action on server
@@ -112,7 +123,7 @@ public class Gun : NetworkBehaviour
     private void ShootAction(bool isRealAction)
     {
         //Debug.Log("Shoot " + (blank ? "fake" : "real") + " bullets");
-        audioSource.PlayOneShot(audioSource.clip);
+        _audioSource.PlayOneShot(_audioSource.clip);
 
         GameObject b = ObjectPool.Instance.instanciate(bullet);
         b.transform.position = muzzle.position;
