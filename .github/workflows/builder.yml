@@ -19,23 +19,27 @@ jobs:
           - Windows64
           - Linux64
     steps:
-      - uses: actions/checkout@v2
+      - name: Download Repository
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
           lfs: true
-      - uses: actions/cache@v2
+      - name: Check Cache
+        uses: actions/cache@v2
         with:
           path: Library
           key: Library-${{ matrix.targetPlatform }}
-          restore-keys: Library-
-      - uses: game-ci/unity-builder@v2.0-alpha-9
+          restore-keys: Library-      
+      - name: Build Project
+        uses: game-ci/unity-builder@v2
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           buildName: LootyShooty-${{ matrix.targetPlatform }}
           buildsPath: build
           targetPlatform: Standalone${{ matrix.targetPlatform }}
-      - uses: actions/upload-artifact@v2.2.3
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
         with:
           name: LootyShooty-${{ matrix.targetPlatform }}
           path: build
@@ -44,16 +48,19 @@ jobs:
     name: Build Server Linux64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Download Repository
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
           lfs: true
-      - uses: actions/cache@v2
+      - name: Check Cache
+        uses: actions/cache@v2
         with:
           path: Library
           key: Library-Server-StandaloneLinux64
           restore-keys: Library-Server-
-      - uses: game-ci/unity-builder@v2.0-alpha-9
+      - name: Build Project
+        uses: game-ci/unity-builder@v2
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
@@ -61,7 +68,8 @@ jobs:
           buildName: LootyShooty-Server-Linux64
           buildsPath: build
           targetPlatform: StandaloneLinux64
-      - uses: actions/upload-artifact@v2.2.3
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
         with:
           name: LootyShooty-Server-Linux64
           path: build
