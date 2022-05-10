@@ -188,7 +188,8 @@ public class FishController : NetworkBehaviour
         if (base.IsServer)
         {
             Move(default, true);
-            ReconcileData rd = new ReconcileData(transform.position, transform.rotation, _velocity);
+            //ReconcileData rd = new ReconcileData(transform.position, transform.rotation, _velocity);
+            ReconcileData rd = new ReconcileData(transform.position, transform.rotation, _characterController.velocity);
             Reconciliation(rd, true);
         }
     }
@@ -245,7 +246,7 @@ public class FishController : NetworkBehaviour
         Vector2 move = new Vector3(md.Horizontal, md.Vertical);
 
 
-        //_velocity = _characterController.velocity;
+        _velocity = _characterController.velocity;
 
         bool shouldJump = _lastJumpTick != InstanceFinder.TimeManager.LastPacketTick && md.Jump;
 
@@ -330,8 +331,8 @@ public class FishController : NetworkBehaviour
     {
         transform.position = rd.Position;
         transform.rotation = rd.Rotation;
-        //_characterController.velocity.Set(rd.Velocity);
-        _velocity = rd.Velocity;
+        _characterController.velocity.Set(rd.Velocity.x, rd.Velocity.y, rd.Velocity.z);
+        //_velocity = rd.Velocity;
     }
 
 

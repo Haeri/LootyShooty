@@ -10,7 +10,8 @@ public class NetworkPlayer : NetworkBehaviour
     [SyncVar] public int ping;
 
     [SerializeField] public GameObject pawnPrefab;
-    [SerializeField] public GameObject currentPawn;
+    
+    public GameObject _currentPawn { get; private set; }
 
     public override void OnStartClient()
     {
@@ -29,7 +30,7 @@ public class NetworkPlayer : NetworkBehaviour
     [ServerRpc]
     private void ServerSpawnPawn()
     {
-        currentPawn = Instantiate(pawnPrefab);
-        Spawn(currentPawn, Owner);
+        _currentPawn = Instantiate(pawnPrefab);
+        Spawn(_currentPawn, Owner);
     }
 }
