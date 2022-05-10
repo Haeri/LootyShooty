@@ -5,18 +5,16 @@
 
 ![](./Pages/screenshot.png)
 
-A work in progress multiplayer first person shooter in Unity with the new [Netcode for GameObjects](https://docs-multiplayer.unity3d.com/docs/getting-started/about/index.html). Trying to figure out how this works. But I can tell you this much, this is an uphill battle.
+A work in progress multiplayer first person shooter in Unity with the new [FisNet Networking](https://github.com/FirstGearGames/FishNet).
 
 
 ## TODO
 
+- [x] Server Authoritive movement
+- [x] Client Side Predition & Reconciliation
 - [x] Headless server
 - [x] Lootable guns
-- [x] True first person camera
 - [x] Hitbox region multiplier
-- [x] Client side predition
 - [x] Hitmarkers
-- [ ] Server authoritive movement
 - [ ] Hybrid projectile/hitscan bullets
 - [ ] Deterministic spray patterns
-- [ ] Rollback
