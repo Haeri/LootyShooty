@@ -592,12 +592,13 @@ namespace FishNet.Managing.Timing
         /// </summary>
         private void IncreaseTick()
         {
+            bool isClient = _networkManager.IsClient;
+
             double timePerSimulation = (_networkManager.IsServer) ? TickDelta : _adjustedTickDelta;
             double time = Time.deltaTime;
             _elapsedTickTime += time;
-
             FrameTicked = (_elapsedTickTime >= timePerSimulation);
-            bool isClient = _networkManager.IsClient;
+
             while (_elapsedTickTime >= timePerSimulation)
             {
                 _elapsedTickTime -= timePerSimulation;
