@@ -25,14 +25,6 @@ namespace FishNet.Transporting
         #region Initialization and unity.
         /// <summary>
         /// Initializes the transport. Use this instead of Awake.
-        /// </summary>
-        [Obsolete("This method is being replaced with Initialize(networkManager, transportIndex) to support multiple transports at once.")]  //Remove on 2022/06/01 in favor of AllowStacking.
-        public virtual void Initialize(NetworkManager networkManager)
-        {
-            NetworkManager = networkManager;
-        }
-        /// <summary>
-        /// Initializes the transport. Use this instead of Awake.
         /// <paramref name="transportIndex"/>Index this transport belongs to when using multiple transports at once.</param>
         /// </summary>
         public virtual void Initialize(NetworkManager networkManager, int transportIndex)
@@ -80,12 +72,12 @@ namespace FishNet.Transporting
         /// Gets the current local ConnectionState.
         /// </summary>
         /// <param name="server">True if getting ConnectionState for the server.</param>
-        public abstract LocalConnectionStates GetConnectionState(bool server);
+        public abstract LocalConnectionState GetConnectionState(bool server);
         /// <summary>
         /// Gets the current ConnectionState of a client connected to the server. Can only be called on the server.
         /// </summary>
         /// <param name="connectionId">ConnectionId to get ConnectionState for.</param>
-        public abstract RemoteConnectionStates GetConnectionState(int connectionId);
+        public abstract RemoteConnectionState GetConnectionState(int connectionId);
         #endregion
 
         #region Sending.
@@ -145,11 +137,16 @@ namespace FishNet.Transporting
         /// </summary>
         public virtual bool IsLocalTransport(int connectionid) => false;
         /// <summary>
-        /// How long in seconds until either the server or client socket must go without data before being timed out.
+        /// Gets how long in seconds until either the server or client socket must go without data before being timed out.
         /// </summary>
         /// <param name="asServer">True to get the timeout for the server socket, false for the client socket.</param>
         /// <returns></returns>
         public virtual float GetTimeout(bool asServer) => -1f;
+        /// <summary>
+        /// Sets how long in seconds until either the server or client socket must go without data before being timed out.
+        /// </summary>
+        /// <param name="asServer">True to set the timeout for the server socket, false for the client socket.</param>
+        public virtual void SetTimeout(float value, bool asServer) { }
         /// <summary>
         /// Returns the maximum number of clients allowed to connect to the server. If the transport does not support this method the value -1 is returned.
         /// </summary>
@@ -184,7 +181,7 @@ namespace FishNet.Transporting
         /// Sets which address the server will bind to.
         /// </summary>
         /// <param name="address">Address server will bind to.</param>
-        [Obsolete("Use SetServerBindAddress(IPAddressType)")] //Remove on 01/01/2023
+        [Obsolete("Use SetServerBindAddress(string, IPAddressType)")] //Remove on 01/01/2023
         public virtual void SetServerBindAddress(string address) { }
         /// <summary>
         /// Gets which address the server will bind to.
@@ -228,7 +225,9 @@ namespace FishNet.Transporting
         /// Stops a remote client from the server, disconnecting the client.
         /// </summary>
         /// <param name="connectionId">ConnectionId of the client to disconnect.</param>
-        /// <param name="immediately">True to abrutly stp the client socket without waiting socket thread.</param>
+        /// <param name="immediately">True to abrutly stop the client socket. The technique used to accomplish immediate disconnects may vary depending on the transport.
+        /// When not using immediate disconnects it's recommended to perform disconnects using the ServerManager rather than accessing the transport directly.
+        /// </param>
         public abstract bool StopConnection(int connectionId, bool immediately);
         /// <summary>
         /// Stops both client and server.
@@ -237,24 +236,6 @@ namespace FishNet.Transporting
         #endregion
 
         #region Channels.
-        /// <summary>
-        /// Gets the number of channels this transport supports.
-        /// </summary>
-        /// <returns></returns>
-        [Obsolete("This method is being removed in a future version. Channel count will always be 2, for reliable and unreliable.")] //Remove on 2022/06/01.
-        public virtual byte GetChannelCount() { return 2; }
-        /// <summary>
-        /// Returns which channel to use by default for reliable.
-        /// </summary>
-        /// <returns>Channel as byte.</returns>
-        [Obsolete("This method will be removed. Reliable will always be 0, and unreliable always 1.")]
-        public virtual byte GetDefaultReliableChannel() { return 0; }  //Remove on 2022/06/01.
-        /// <summary>
-        /// Returns which channel to use by default for unreliable.
-        /// </summary>
-        /// <returns>Channel as byte.</returns>
-        [Obsolete("This method will be removed. Reliable will always be 0, and unreliable always 1.")]
-        public virtual byte GetDefaultUnreliableChannel() { return 1; } //Remove on 2022/06/01.
         /// <summary>
         /// Gets the MTU for a channel.
         /// </summary>

@@ -114,7 +114,7 @@ namespace FishNet.Managing.Server
         {
 
             //If server just connected.
-            if (args.ConnectionState == LocalConnectionStates.Started)
+            if (args.ConnectionState == LocalConnectionState.Started)
             {
                 /* If there's no servers started besides the one
                  * that just started then build Ids and setup scene objects. */
@@ -285,7 +285,7 @@ namespace FishNet.Managing.Server
         private void SetupSceneObjects(Scene s)
         {
             ListCache<NetworkObject> nobs;
-            SceneFN.GetSceneNetworkObjects(s, true, out nobs);
+            SceneFN.GetSceneNetworkObjects(s, false, out nobs);
             bool isHost = base.NetworkManager.IsHost;
 
             for (int i = 0; i < nobs.Written; i++)
@@ -389,6 +389,12 @@ namespace FishNet.Managing.Server
              * Set visibility based on if the observers contains the clientHost connection. */
             if (NetworkManager.IsClient)
                 networkObject.SetHostVisibility(networkObject.Observers.Contains(NetworkManager.ClientManager.Connection));
+
+            //foreach (NetworkObject childNob in networkObject.ChildNetworkObjects)
+            //{
+            //    if (childNob != null && !childNob.IsSpawned)
+            //        Spawn(childNob, ownerConnection, synchronizeParent);
+            //}
         }
 
         /// <summary>
@@ -571,10 +577,18 @@ namespace FishNet.Managing.Server
         /// <summary>
         /// Tries to removes objectId from PendingDestroy and returns if successful.
         /// </summary>
-        /// <param name="objectId"></param>
         internal bool RemoveFromPending(int objectId)
         {
             return _pendingDestroy.Remove(objectId);
+        }
+        /// <summary>
+        /// Returns a NetworkObject in PendingDestroy.
+        /// </summary>
+        internal NetworkObject GetFromPending(int objectId)
+        {
+            NetworkObject nob;
+            _pendingDestroy.TryGetValue(objectId, out nob);
+            return nob;
         }
         /// <summary>
         /// Destroys NetworkObjects pending for destruction.

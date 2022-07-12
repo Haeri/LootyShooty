@@ -20,6 +20,9 @@ using FishNet.Managing.Debugging;
 using FishNet.Managing.Object;
 using FishNet.Transporting;
 using FishNet.Utility.Extension;
+#if UNITY_EDITOR
+using FishNet.Editing.PrefabCollectionGenerator;
+#endif
 
 namespace FishNet.Managing
 {
@@ -220,11 +223,15 @@ namespace FishNet.Managing
              * cloning tools sometimes don't synchronize
              * scriptable object changes, which is what
              * the default prefabs is. */
-            if (_refreshDefaultPrefabs && SpawnablePrefabs != null && SpawnablePrefabs is DefaultPrefabObjects dpo)
+            if (_instances.Count == 0 && SpawnablePrefabs != null && SpawnablePrefabs is DefaultPrefabObjects dpo)
             {
-                DefaultPrefabObjects.CanAutomate = false;
-                dpo.PopulateDefaultPrefabs(false);
-                DefaultPrefabObjects.CanAutomate = true;
+                if (_refreshDefaultPrefabs)
+                {
+                    Generator.IgnorePostProcess = true;
+                    Debug.Log("DefaultPrefabCollection is being refreshed.");
+                    Generator.GenerateFull();
+                    Generator.IgnorePostProcess = false;
+                }
             }
 #endif
 
@@ -251,7 +258,7 @@ namespace FishNet.Managing
             InitializeComponents();
 
             _instances.Add(this);
-            Initialized = true;            
+            Initialized = true;
         }
 
         private void Start()
@@ -299,10 +306,11 @@ namespace FishNet.Managing
              * If it is then default to tick rate. If framerate is
              * less than tickrate then also set to tickrate. */
 #if UNITY_SERVER
+            ushort minimumServerFramerate = (ushort)(TimeManager.TickRate + 1);
             if (frameRate == MAXIMUM_FRAMERATE)
-                frameRate = TimeManager.TickRate;
+                frameRate = minimumServerFramerate;
             else if (frameRate < TimeManager.TickRate)
-                frameRate = TimeManager.TickRate;
+                frameRate = minimumServerFramerate;
 #endif
             //If there is a framerate to set.
             if (frameRate > 0)

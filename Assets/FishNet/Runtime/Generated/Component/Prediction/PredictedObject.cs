@@ -10,6 +10,14 @@ namespace FishNet.Component.Prediction
     {
         #region Types.
         /// <summary>
+        /// How to smooth. Over the tick duration or specified time.
+        /// </summary>
+        public enum SmoothingDurationType : byte
+        {
+            Tick = 0,
+            Time = 1
+        }
+        /// <summary>
         /// Type of prediction movement being used.
         /// </summary>
         internal enum PredictionType : byte
@@ -35,11 +43,37 @@ namespace FishNet.Component.Prediction
         [SerializeField]
         private Transform _graphicalObject;
         /// <summary>
+        /// Gets GraphicalObject.
+        /// </summary>
+        public Transform GetGraphicalObject => _graphicalObject;
+        /// <summary>
+        /// Sets GraphicalObject.
+        /// </summary>
+        /// <param name="value"></param>
+        public void SetGraphicalObject(Transform value) => _graphicalObject = value;
+        /// <summary>
         /// True to smooth graphical object over tick durations. While true objects will be smooth even with low tick rates, but the visual representation will be behind one tick.
         /// </summary>
         [Tooltip("True to smooth graphical object over tick durations. While true objects will be smooth even with low tick rates, but the visual representation will be behind one tick.")]
         [SerializeField]
         private bool _smoothTicks = true;
+        /// <summary>
+        /// Gets the value for SmoothTicks.
+        /// </summary>
+        /// <returns></returns>
+        public bool GetSmoothTicks() => _smoothTicks;
+        /// <summary>
+        /// Sets the value for SmoothTicks.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public void SetSmoothTicks(bool value) => _smoothTicks = value;
+        /// <summary>
+        /// How to smooth desynchronizations. Tick will smooth over the tick while Time will smooth over a set duration.
+        /// </summary>
+        [Tooltip("How to smooth desynchronizations. Tick will smooth over the tick while Time will smooth over a set duration.")]
+        [SerializeField]
+        private SmoothingDurationType _durationType = SmoothingDurationType.Tick;
         /// <summary>
         /// Duration to smooth desynchronizations over.
         /// </summary>
@@ -47,6 +81,19 @@ namespace FishNet.Component.Prediction
         [Range(0.01f, 0.5f)]
         [SerializeField]
         private float _smoothingDuration = 0.125f;
+        /// <summary>
+        /// True to enable teleport threshhold.
+        /// </summary>
+        [Tooltip("True to enable teleport threshhold.")]
+        [SerializeField]
+        private bool _enableTeleport;
+        /// <summary>
+        /// How far the transform must travel in a single update to cause a teleport rather than smoothing. Using 0f will teleport every update.
+        /// </summary>
+        [Tooltip("How far the transform must travel in a single update to cause a teleport rather than smoothing. Using 0f will teleport every update.")]
+        [Range(0f, float.MaxValue)]
+        [SerializeField]
+        private float _teleportThreshold = 1f;
         /// <summary>
         /// Type of prediction movement which is being used.
         /// </summary>
@@ -104,7 +151,7 @@ namespace FishNet.Component.Prediction
         /// <summary>
         /// How quickly to move towards TargetPosition.
         /// </summary>
-        private float _positionMoveRate;
+        private float _positionMoveRate = -2;
         /// <summary>
         /// Local rotation of transform when instantiated.
         /// </summary>
@@ -112,7 +159,7 @@ namespace FishNet.Component.Prediction
         /// <summary>
         /// How quickly to move towards TargetRotation.
         /// </summary>
-        private float _rotationMoveRate;
+        private float _rotationMoveRate = -2;
         #endregion
 
         #region Consts.
@@ -124,17 +171,36 @@ namespace FishNet.Component.Prediction
 
         private void Awake()
         {
-            ConfigureNetworkTransform();
-            //Set in awake so they arent default.
-            SetPreviousTransformProperties();
-
             if (Application.isPlaying)
-                InitializeOnce();
-            PartialRigidbodies_Awake();
-            PartialDifferenceSmoother_Awake();
+            {
+                if (!InitializeOnce())
+                {
+                    this.enabled = false;
+                    return;
+                }
+            }
+
+            ConfigureNetworkTransform();
+            //Set in awake so they are default.
+            SetPreviousTransformProperties();
         }
-        partial void PartialRigidbodies_Awake();
-        partial void PartialDifferenceSmoother_Awake();
+
+        private void OnEnable()
+        {
+            /* Only subscribe if client. Client may not be set
+             * yet but that's okay because the OnStartClient
+             * callback will catch the subscription. This is here
+             * should the user disable then re-enable the object after
+             * it's initialized. */
+            if (base.IsClient)
+                ChangeSubscriptions(true);
+        }
+        private void OnDisable()
+        {
+            //Only unsubscribe if client.
+            if (base.IsClient)
+                ChangeSubscriptions(false);
+        }
 
         public override void OnStartNetwork()
         {
@@ -142,67 +208,49 @@ namespace FishNet.Component.Prediction
             base.TimeManager.OnPostTick += TimeManager_OnPostTick;
             _instantiatedLocalPosition = _graphicalObject.localPosition;
             _instantiatedLocalRotation = _graphicalObject.localRotation;
-            PartialRigidbodies_OnStartNetwork();
         }
-        partial void PartialRigidbodies_OnStartNetwork();
 
         public override void OnStartClient()
         {
             base.OnStartClient();
             ChangeSubscriptions(true);
-            PartialRigidbodies_OnStartClient();
         }
-        partial void PartialRigidbodies_OnStartClient();
 
         public override void OnStopClient()
         {
             base.OnStopClient();
             ChangeSubscriptions(false);
-            PartialRigidbodies_OnStopClient();
         }
-        partial void PartialRigidbodies_OnStopClient();
-
         public override void OnStopNetwork()
         {
             base.OnStopNetwork();
             if (base.TimeManager != null)
                 base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
-            PartialRigidbodies_OnStopNetwork();
         }
-        partial void PartialRigidbodies_OnStopNetwork();
 
         private void Update()
         {
-            PartialRigidbodies_Update();
-            PartialDifferenceSmoother_Update();
+            MoveToTarget();
         }
-        partial void PartialRigidbodies_Update();
-        partial void PartialDifferenceSmoother_Update();
 
-
+        private void TimeManager_OnPreTick()
+        {
+            if (CanSmooth())
+                SetPreviousTransformProperties();
+        }
 
         protected void TimeManager_OnPostTick()
         {
             if (CanSmooth())
             {
-                SetTransformMoveRates();
                 ResetToTransformPreviousProperties();
+                SetTransformMoveRates();
+                //Move 1 frame immediately since post tick occurs after update.
+                MoveToTarget();
             }
-            PartialRigidbodies_TimeManager_OnPostTick();
+            Rigidbodies_TimeManager_OnPostTick();
         }
-        partial void PartialRigidbodies_TimeManager_OnPostTick();
 
-
-        /// <summary>
-        /// Called before performing a reconcile on NetworkBehaviour.
-        /// </summary>
-        protected virtual void TimeManager_OnPreReconcile(NetworkBehaviour obj)
-        {
-            PartialRigidbodies_TimeManager_OnPreReconcile(obj);
-            PartialDifferenceSmoother_TimeManager_OnPreReconcile(obj);
-        }
-        partial void PartialRigidbodies_TimeManager_OnPreReconcile(NetworkBehaviour obj);
-        partial void PartialDifferenceSmoother_TimeManager_OnPreReconcile(NetworkBehaviour obj);
 
         /// <summary>
         /// Called before physics is simulated when replaying a replicate method.
@@ -210,27 +258,9 @@ namespace FishNet.Component.Prediction
         /// </summary>
         protected virtual void TimeManager_OnPostReplicateReplay(PhysicsScene ps, PhysicsScene2D ps2d)
         {
-            PartialRigidbodies_TimeManager_OnPostReplicateReplay(ps, ps2d);
+            Rigidbodies_TimeManager_OnPostReplicateReplay(ps, ps2d);
         }
-        partial void PartialRigidbodies_TimeManager_OnPostReplicateReplay(PhysicsScene ps, PhysicsScene2D ps2d);
 
-        /// <summary>
-        /// Called after performing a reconcile on a NetworkBehaviour.
-        /// </summary>
-        protected virtual void TimeManager_OnPostReconcile(NetworkBehaviour obj)
-        {
-            PartialRigidbodies_TimeManager_OnPostReconcile(obj);
-            PartialDifferenceSmoother_TimeManager_OnPostReconcile(obj);
-        }
-        partial void PartialRigidbodies_TimeManager_OnPostReconcile(NetworkBehaviour obj);
-        partial void PartialDifferenceSmoother_TimeManager_OnPostReconcile(NetworkBehaviour obj);
-
-
-        private void TimeManager_OnPreTick()
-        {
-            if (CanSmooth())
-                SetPreviousTransformProperties();
-        }
 
         /// <summary>
         /// Subscribes to events needed to function.
@@ -246,16 +276,12 @@ namespace FishNet.Component.Prediction
             if (subscribe)
             {
                 base.TimeManager.OnPreTick += TimeManager_OnPreTick;
-                base.TimeManager.OnPreReconcile += TimeManager_OnPreReconcile;
                 base.TimeManager.OnPostReplicateReplay += TimeManager_OnPostReplicateReplay;
-                base.TimeManager.OnPostReconcile += TimeManager_OnPostReconcile;
             }
             else
             {
                 base.TimeManager.OnPreTick -= TimeManager_OnPreTick;
-                base.TimeManager.OnPreReconcile -= TimeManager_OnPreReconcile;
                 base.TimeManager.OnPostReplicateReplay -= TimeManager_OnPostReplicateReplay;
-                base.TimeManager.OnPostReconcile -= TimeManager_OnPostReconcile;
             }
 
             _subscribed = subscribe;
@@ -263,18 +289,21 @@ namespace FishNet.Component.Prediction
 
 
         /// <summary>
-        /// Initializes this script for use.
+        /// Initializes this script for use. Returns true for success.
         /// </summary>
-        private void InitializeOnce()
+        private bool InitializeOnce()
         {
             //No graphical object, cannot smooth.
             if (_graphicalObject == null)
             {
                 if (NetworkManager.StaticCanLog(LoggingType.Error))
                     Debug.LogError($"GraphicalObject is not set on {gameObject.name}. Initialization will fail.");
-                return;
+                return false;
             }
+
+            return true;
         }
+
 
         /// <summary>
         /// Returns if prediction can be used on this rigidbody.
@@ -282,13 +311,13 @@ namespace FishNet.Component.Prediction
         /// <returns></returns>
         private bool CanSmooth()
         {
-            //Only client needs smoothing.
-            if (!base.IsClient)
-                return false;
             if (!_smoothTicks)
                 return false;
+            //Only client needs smoothing.
+            if (base.IsServerOnly)
+                return false;
 
-            return !base.IsServerOnly;
+            return true;
         }
 
         /// <summary>
@@ -297,22 +326,30 @@ namespace FishNet.Component.Prediction
         private void MoveToTarget()
         {
             //Not set, meaning movement doesnt need to happen or completed.
-            if (_positionMoveRate == -1f && _rotationMoveRate == -1f)
+            if (_positionMoveRate == -2f && _rotationMoveRate == -2f)
                 return;
+
+            /* Only try to update properties if they have a valid move rate.
+             * Properties may have 0f move rate if they did not change. */
 
             Transform t = _graphicalObject;
             float delta = Time.deltaTime;
-            if (_positionMoveRate > 0f)
+            //Position.
+            if (_positionMoveRate == -1f)
+                t.localPosition = _instantiatedLocalPosition;
+            else if (_positionMoveRate > 0f)
                 t.localPosition = Vector3.MoveTowards(t.localPosition, _instantiatedLocalPosition, _positionMoveRate * delta);
-            if (_rotationMoveRate > 0f)
+            //Rotation.
+            if (_rotationMoveRate == -1f)
+                t.localRotation = _instantiatedLocalRotation;
+            else if (_rotationMoveRate > 0f)
                 t.localRotation = Quaternion.RotateTowards(t.localRotation, _instantiatedLocalRotation, _rotationMoveRate * delta);
 
             if (GraphicalObjectMatches(_instantiatedLocalPosition, _instantiatedLocalRotation))
             {
-                _positionMoveRate = -1f;
-                _rotationMoveRate = -1f;
+                _positionMoveRate = -2f;
+                _rotationMoveRate = -2f;
             }
-
         }
 
 
@@ -320,16 +357,31 @@ namespace FishNet.Component.Prediction
         /// Sets Position and Rotation move rates to reach Target datas.
         /// </summary>
         /// <param name="durationOverride">Smooth of this duration when not set to -1f. Otherwise TimeManager.TickDelta is used.</param>
-        private void SetTransformMoveRates(float durationOverride = -1f)
+        private void SetTransformMoveRates()
         {
-            float delta = (durationOverride == -1f) ? (float)base.TimeManager.TickDelta : durationOverride;
-            float distance;
+            float timeManagerDelta = (float)base.TimeManager.TickDelta;
+            float delta = (_durationType == SmoothingDurationType.Tick) ? timeManagerDelta : _smoothingDuration;
+            /* delta can never be faster than tick rate, otherwise the object will always 
+             * get to smoothing goal before the next tick. */
+            if (delta < timeManagerDelta)
+                delta = timeManagerDelta;
 
+            float distance;
             distance = Vector3.Distance(_instantiatedLocalPosition, _graphicalObject.localPosition);
-            _positionMoveRate = (distance / delta);
-            distance = Quaternion.Angle(_instantiatedLocalRotation, _graphicalObject.localRotation);
-            if (distance > 0f)
-                _rotationMoveRate = (distance / delta);
+            //If qualifies for teleporting.
+            if (_enableTeleport && distance >= _teleportThreshold)
+            {
+                _positionMoveRate = -1f;
+                _rotationMoveRate = -1f;
+            }
+            //Smoothing.
+            else
+            {
+                _positionMoveRate = (distance / delta);
+                distance = Quaternion.Angle(_instantiatedLocalRotation, _graphicalObject.localRotation);
+                if (distance > 0f)
+                    _rotationMoveRate = (distance / delta);
+            }
         }
 
 
@@ -347,11 +399,8 @@ namespace FishNet.Component.Prediction
         /// </summary>
         private void ResetToTransformPreviousProperties()
         {
-            _graphicalObject.position = _previousPosition;
-            _graphicalObject.rotation = _previousRotation;
+            _graphicalObject.SetPositionAndRotation(_previousPosition, _previousRotation);
         }
-
-
 
         /// <summary>
         /// Returns if this transform matches arguments.

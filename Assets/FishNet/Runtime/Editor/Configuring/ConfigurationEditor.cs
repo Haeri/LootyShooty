@@ -1,9 +1,5 @@
 ﻿#if UNITY_EDITOR
 using FishNet.Editing;
-using System;
-using System.IO;
-using System.Xml;
-using System.Xml.Serialization;
 using UnityEditor;
 using UnityEngine;
 
@@ -31,16 +27,17 @@ namespace FishNet.Configuring.Editing
         /// </summary>
         private void SaveConfiguration()
         {
-            string path = CodeStripping.GetAssetsPath(CodeStripping.CONFIG_FILE_NAME);
-            CodeStripping.ConfigurationData.Write(path, true);
+            string path = Configuration.GetAssetsPath(Configuration.CONFIG_FILE_NAME);
+            Configuration.ConfigurationData.Write(path, true);
         }
 
 
         [MenuItem("Fish-Networking/Configuration", false, 0)]
         public static void ShowConfiguration()
         {
-            EditorWindow window = GetWindow<ConfigurationEditor>();
-            window.titleContent = new GUIContent("Fish-Networking Configuration");
+            SettingsService.OpenProjectSettings("Project/Fish-Networking/Configuration");
+            //EditorWindow window = GetWindow<ConfigurationEditor>();
+            //window.titleContent = new GUIContent("Fish-Networking Configuration");
             //Dont worry about capping size until it becomes a problem.
             //const int width = 200;
             //const int height = 100;
@@ -55,7 +52,7 @@ namespace FishNet.Configuring.Editing
             //if (_reloadFile)
             //    Configuration.LoadConfiguration();
 
-            ConfigurationData data = CodeStripping.GetConfigurationData();
+            ConfigurationData data = Configuration.LoadConfigurationData();
 
             if (data == null)
                 return;

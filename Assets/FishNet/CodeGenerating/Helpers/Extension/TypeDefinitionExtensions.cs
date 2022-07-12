@@ -1,5 +1,7 @@
 ﻿using MonoFN.Cecil;
+using MonoFN.Collections.Generic;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -9,6 +11,121 @@ namespace FishNet.CodeGenerating.Helping.Extension
 
     internal static class TypeDefinitionExtensions
     {
+
+        /// <summary>
+        /// Creates a GenericInstanceType and adds parameters.
+        /// </summary>
+        internal static GenericInstanceType CreateGenericInstanceType(this TypeDefinition type, Collection<GenericParameter> parameters)
+        {
+            GenericInstanceType git = new GenericInstanceType(type);
+            foreach (GenericParameter gp in parameters)
+                git.GenericArguments.Add(gp);
+
+            return git;
+        }
+
+        /// <summary>
+        /// Finds public fields in type and base type
+        /// </summary>
+        /// <param name="variable"></param>
+        /// <returns></returns>
+        public static IEnumerable<FieldDefinition> FindAllPublicFields(this TypeDefinition typeDef, bool ignoreStatic, bool ignoreNonSerialized, System.Type[] excludedBaseTypes = null, string[] excludedAssemblyPrefixes = null)
+        {
+            while (typeDef != null)
+            {
+                if (IsExcluded(typeDef, excludedBaseTypes, excludedAssemblyPrefixes))
+                    break;
+
+                foreach (FieldDefinition field in typeDef.Fields)
+                {
+                    if (ignoreStatic && field.IsStatic)
+                        continue;
+                    if (field.IsPrivate)
+                        continue;
+                    if (ignoreNonSerialized && field.IsNotSerialized)
+                        continue;
+
+                    yield return field;
+                }
+
+                try { typeDef = typeDef.BaseType?.CachedResolve(); }
+                catch { break; }
+            }
+        }
+
+        /// <summary>
+        /// Finds public properties on typeDef and all base types which have a public get/set accessor.
+        /// </summary>
+        /// <param name="typeDef"></param>
+        /// <returns></returns>
+        public static IEnumerable<PropertyDefinition> FindAllPublicProperties(this TypeDefinition typeDef, System.Type[] excludedBaseTypes = null, string[] excludedAssemblyPrefixes = null)
+        {
+            while (typeDef != null)
+            {
+                if (IsExcluded(typeDef, excludedBaseTypes, excludedAssemblyPrefixes))
+                    break;
+
+                foreach (PropertyDefinition prop in typeDef.Properties)
+                {
+                    //Missing get or set method.
+                    if (prop.GetMethod == null || prop.SetMethod == null)
+                        continue;
+                    //Get or set is private.
+                    if (prop.GetMethod.IsPrivate || prop.SetMethod.IsPrivate)
+                        continue;
+
+                    yield return prop;
+                }
+
+                try { typeDef = typeDef.BaseType?.CachedResolve(); }
+                catch { break; }
+            }
+
+
+        }
+
+        /// <summary>
+        /// Returns if typeDef is excluded.
+        /// </summary>
+        private static bool IsExcluded(TypeDefinition typeDef, System.Type[] excludedBaseTypes = null, string[] excludedAssemblyPrefixes = null)
+        {
+            if (excludedBaseTypes != null)
+            {
+                foreach (System.Type t in excludedBaseTypes)
+                {
+                    if (typeDef.FullName == t.FullName)
+                        return true;
+                }
+            }
+            if (excludedAssemblyPrefixes != null)
+            {
+                foreach (string s in excludedAssemblyPrefixes)
+                {
+                    int len = s.Length;
+                    string tdAsmName = typeDef.Module.Assembly.FullName;
+                    if (tdAsmName.Length >= len && tdAsmName.Substring(0, len).ToLower() == s.ToLower())
+                        return true;
+                }
+            }
+            //Fall through, not excluded.
+            return false;
+        }
+
+
+        /// <summary>
+        /// Returns if typeDef is excluded.
+        /// </summary>
+        public static bool IsExcluded(this TypeDefinition typeDef, string excludedAssemblyPrefix)
+        {
+
+            int len = excludedAssemblyPrefix.Length;
+            string tdAsmName = typeDef.Module.Assembly.FullName;
+            if (tdAsmName.Length >= len && tdAsmName.Substring(0, len).ToLower() == excludedAssemblyPrefix.ToLower())
+                return true;
+
+            //Fall through, not excluded.
+            return false;
+        }
 
         /// <summary>
         /// Returns if typeDef or any of it's parents inherit from NetworkBehaviour.
@@ -137,11 +254,9 @@ namespace FishNet.CodeGenerating.Helping.Extension
         /// <summary>
         /// Returns if typeDef is static (abstract, sealed).
         /// </summary>
-        /// <param name="typeDef"></param>
-        /// <returns></returns>
         internal static bool IsStatic(this TypeDefinition typeDef)
         {
-            //Combing flags in a single check some reason doesn't work right with HasFlag.
+            //Combining flags in a single check some reason doesn't work right with HasFlag.
             return (typeDef.Attributes.HasFlag(TypeAttributes.Abstract) && typeDef.Attributes.HasFlag(TypeAttributes.Sealed));
         }
 

@@ -197,6 +197,7 @@ namespace FishNet.Object
             NetworkManager = networkManager;
             ServerManager = networkManager.ServerManager;
             ClientManager = networkManager.ClientManager;
+            ObserverManager = networkManager.ObserverManager;
             TransportManager = networkManager.TransportManager;
             TimeManager = networkManager.TimeManager;
             SceneManager = networkManager.SceneManager;
@@ -368,7 +369,7 @@ namespace FishNet.Object
             if (asServer)
             {
                 if (activeNewOwner)
-                    NetworkManager.ServerManager.Objects.RebuildObservers(this, newOwner);
+                    ServerManager.Objects.RebuildObservers(this, newOwner);
 
                 using (PooledWriter writer = WriterPool.GetWriter())
                 {
@@ -391,7 +392,7 @@ namespace FishNet.Object
                 }
 
                 if (prevOwner.IsActive)
-                    RebuildObservers(prevOwner, false);
+                    ServerManager.Objects.RebuildObservers(prevOwner);
             }
         }
 
@@ -443,16 +444,14 @@ namespace FishNet.Object
         private void OnValidate()
         {
             SceneUpdateNetworkBehaviours();
-            PartialOnValidate();
+            ReferenceIds_OnValidate();
         }
-        partial void PartialOnValidate();
         private void Reset()
         {
             SerializeSceneTransformProperties();
             SceneUpdateNetworkBehaviours();
-            PartialReset();
+            ReferenceIds_Reset();
         }
-        partial void PartialReset();
 
         private void SceneUpdateNetworkBehaviours()
         {

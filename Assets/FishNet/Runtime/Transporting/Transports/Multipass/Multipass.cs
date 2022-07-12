@@ -175,7 +175,7 @@ namespace FishNet.Transporting.Multipass
                 foreach (Transport t in Transports)
                 {
                     //Cannot clear if a server is running still.
-                    if (t.GetConnectionState(true) == LocalConnectionStates.Started)
+                    if (t.GetConnectionState(true) == LocalConnectionState.Started)
                         return;
                 }
             }
@@ -253,29 +253,29 @@ namespace FishNet.Transporting.Multipass
         /// </summary>
         /// <param name="server">True if getting ConnectionState for the server.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override LocalConnectionStates GetConnectionState(bool server)
+        public override LocalConnectionState GetConnectionState(bool server)
         {
             if (server)
             {
                 if (base.NetworkManager.CanLog(LoggingType.Error))
                     Debug.LogError($"This method is not supported for server. Use GetConnectionState(server, transportIndex) instead.");
-                return LocalConnectionStates.Stopped;
+                return LocalConnectionState.Stopped;
             }
 
             if (IsClientTransportSetWithError("GetConnectionState"))
                 return GetConnectionState(server, ClientTransport.Index);
             else
-                return LocalConnectionStates.Stopped;
+                return LocalConnectionState.Stopped;
         }
         /// <summary>
         /// Gets the current local ConnectionState of the transport on index.
         /// </summary>
         /// <param name="server">True if getting ConnectionState for the server.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public LocalConnectionStates GetConnectionState(bool server, int index)
+        public LocalConnectionState GetConnectionState(bool server, int index)
         {
             if (!IndexInRange(index, true))
-                return LocalConnectionStates.Stopped;
+                return LocalConnectionState.Stopped;
 
             return _transports[index].GetConnectionState(server);
         }
@@ -284,12 +284,12 @@ namespace FishNet.Transporting.Multipass
         /// </summary>
         /// <param name="connectionId">ConnectionId to get ConnectionState for.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override RemoteConnectionStates GetConnectionState(int connectionId)
+        public override RemoteConnectionState GetConnectionState(int connectionId)
         {
 
             TransportIdData data;
             if (!GetTransportIdData(connectionId, out data))
-                return RemoteConnectionStates.Stopped;
+                return RemoteConnectionState.Stopped;
 
             return _transports[data.TransportIndex].GetConnectionState(connectionId);
         }
@@ -298,10 +298,10 @@ namespace FishNet.Transporting.Multipass
         /// </summary>
         /// <param name="connectionId">ConnectionId to get ConnectionState for.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RemoteConnectionStates GetConnectionState(int connectionId, int index)
+        public RemoteConnectionState GetConnectionState(int connectionId, int index)
         {
             if (!IndexInRange(index, true))
-                return RemoteConnectionStates.Stopped;
+                return RemoteConnectionState.Stopped;
 
             return _transports[index].GetConnectionState(connectionId);
         }
@@ -352,7 +352,7 @@ namespace FishNet.Transporting.Multipass
             Dictionary<int, int> transportToMultipassDict = _transportToMultipass[transportIndex];
 
             //Started.
-            if (connectionStateArgs.ConnectionState == RemoteConnectionStates.Started)
+            if (connectionStateArgs.ConnectionState == RemoteConnectionState.Started)
             {
                 multipassId = _availableIds.Dequeue();
                 transportToMultipassDict[transportId] = multipassId;
@@ -503,7 +503,7 @@ namespace FishNet.Transporting.Multipass
         }
 
         /// <summary>
-        /// Sets the client transport to the first of type T.
+        /// Sets the client transport to the first of type.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         public void SetClientTransport<T>()
@@ -512,6 +512,25 @@ namespace FishNet.Transporting.Multipass
             for (int i = 0; i < _transports.Count; i++)
             {
                 if (_transports[i].GetType() == typeof(T))
+                {
+                    index = i;
+                    break;
+                }
+            }
+
+            SetClientTransport(index);
+        }
+
+        /// <summary>
+        /// Sets the client transport to the first of type T.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        public void SetClientTransport(Type type)
+        {
+            int index = -1;
+            for (int i = 0; i < _transports.Count; i++)
+            {
+                if (_transports[i].GetType() == type)
                 {
                     index = i;
                     break;

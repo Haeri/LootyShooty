@@ -13,7 +13,7 @@ namespace FishNet.Component.Prediction
         /// <summary>
         /// Called after a tick occurs; physics would have simulated if using PhysicsMode.TimeManager.
         /// </summary>
-        partial void PartialRigidbodies_TimeManager_OnPostTick()
+        private void Rigidbodies_TimeManager_OnPostTick()
         {
             if (!IsRigidbodyPrediction)
                 return;
@@ -30,10 +30,11 @@ namespace FishNet.Component.Prediction
 
             if (base.IsServer)
             {
-                if (base.TimeManager.LocalTick >= _nextSendTick || base.TransformMayChange())
+                uint localTick = base.TimeManager.LocalTick;
+                if (localTick >= _nextSendTick || base.TransformMayChange())
                 {
                     uint ticksRequired = base.TimeManager.TimeToTicks(SEND_INTERVAL, TickRounding.RoundUp);
-                    _nextSendTick += ticksRequired;
+                    _nextSendTick = localTick + ticksRequired;
 
                     if (!is2D)
                         SendRigidbodyState();
@@ -44,85 +45,18 @@ namespace FishNet.Component.Prediction
         }
 
 
-        partial void PartialRigidbodies_Update()
-        {
-            if (!CanPredict())
-                return;
-
-            MoveToTarget();
-        }
-
-        /// <summary>
-        /// Called before performing a reconcile on NetworkBehaviour.
-        /// </summary>
-        partial void PartialRigidbodies_TimeManager_OnPreReconcile(NetworkBehaviour obj)
-        {
-            if (!CanPredict())
-                return;
-
-            bool canReset;
-            bool is2D = (_predictionType == PredictionType.Rigidbody2D);
-            if (_smoothTicks)
-            {
-                canReset = false;
-            }
-            else if (!is2D)
-            {
-                _physicsScene = gameObject.scene.GetPhysicsScene();
-                canReset = (_physicsScene == obj.gameObject.scene.GetPhysicsScene());
-            }
-            else
-            {
-                _physicsScene2D = gameObject.scene.GetPhysicsScene2D();
-                canReset = (_physicsScene2D == obj.gameObject.scene.GetPhysicsScene2D());
-            }
-
-            if (canReset)
-            {
-                SetPreviousTransformProperties();
-                if (!is2D)
-                    ResetRigidbodyToData();
-                else
-                    ResetRigidbody2DToData();
-            }
-        }
-
-
-        /// <summary>
-        /// Called after performing a reconcile on a NetworkBehaviour.
-        /// </summary>
-        partial void PartialRigidbodies_TimeManager_OnPostReconcile(NetworkBehaviour obj)
-        {
-            if (!CanPredict())
-                return;
-
-            bool canCalculate = false;
-            bool is2D = (_predictionType == PredictionType.Rigidbody2D);
-            if (!is2D)
-                canCalculate = (_physicsScene == gameObject.scene.GetPhysicsScene());
-            else if (_predictionType == PredictionType.Rigidbody2D)
-                canCalculate = (_physicsScene2D == gameObject.scene.GetPhysicsScene2D());
-
-            if (canCalculate)
-            {
-                SetTransformMoveRates();
-                ResetToTransformPreviousProperties();
-            }
-        }
-
-
         /// <summary>
         /// Called before physics is simulated when replaying a replicate method.
         /// Contains the PhysicsScene and PhysicsScene2D which was simulated.
         /// </summary>
-        partial void PartialRigidbodies_TimeManager_OnPostReplicateReplay(PhysicsScene ps, PhysicsScene2D ps2d)
+        private void Rigidbodies_TimeManager_OnPostReplicateReplay(PhysicsScene ps, PhysicsScene2D ps2d)
         {
             if (!CanPredict())
                 return;
 
             if (_predictionType == PredictionType.Rigidbody)
                 PredictVelocity(ps);
-            else
+            else if (_predictionType == PredictionType.Rigidbody2D)
                 PredictVelocity(ps2d);
         }
 
@@ -353,11 +287,10 @@ namespace FishNet.Component.Prediction
             _receivedRigidbodyState = state;
             ResetRigidbodyToData();
 
-            SetTransformMoveRates();
             ResetToTransformPreviousProperties();
+            SetTransformMoveRates();
         }
         #endregion
-
 
         #region Rigidbody2D.
         #region Type.
@@ -471,8 +404,8 @@ namespace FishNet.Component.Prediction
             _receivedRigidbody2DState = state;
             ResetRigidbody2DToData();
 
-            SetTransformMoveRates();
             ResetToTransformPreviousProperties();
+            SetTransformMoveRates();
         }
         #endregion
 

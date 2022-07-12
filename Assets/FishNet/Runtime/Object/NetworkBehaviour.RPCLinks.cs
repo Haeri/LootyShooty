@@ -11,27 +11,6 @@ namespace FishNet.Object
 
     public abstract partial class NetworkBehaviour : MonoBehaviour
     {
-        #region Types.
-        private struct RpcLinkType
-        {
-            /// <summary>
-            /// Index of link.
-            /// </summary>
-            public ushort LinkIndex;
-            /// <summary>
-            /// Type of Rpc link is for.
-            /// </summary>
-            public RpcType RpcType;
-
-            public RpcLinkType(ushort linkIndex, RpcType rpcType)
-            {
-                LinkIndex = linkIndex;
-                RpcType = rpcType;
-            }
-        }
-
-        #endregion
-
         #region Private.        
         /// <summary>
         /// Link indexes for RPCs.
@@ -92,18 +71,6 @@ namespace FishNet.Object
             }
         }
 
-        ///// <summary>
-        ///// Creates a PooledWriter and writes the header for a rpc.
-        ///// </summary>
-        ///// <param name="writer"></param>
-        ///// <param name="rpcHash"></param>
-        ///// <param name="packetId"></param>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //private void CreateLinkedRpcHeader(RpcLinkType link, PooledWriter writer)
-        //{
-        //    writer.WriteUInt16(link.LinkIndex);
-        //}
-
 
         /// <summary>
         /// Creates a PooledWriter and writes the header for a rpc.
@@ -118,13 +85,24 @@ namespace FishNet.Object
             writer.WriteUInt16(link.LinkIndex);
             //Write length only if reliable.
             if (channel == Channel.Reliable)
-                WriteReliableLength(writer, methodWriter.Length);
+                writer.WriteLength(methodWriter.Length);
             //Data.
             writer.WriteArraySegment(methodWriter.GetArraySegment());
 
             return writer;
         }
 
+        /// <summary>
+        /// Returns RpcLinks the ServerManager.
+        /// </summary>
+        private void ReturnRpcLinks()
+        {
+            if (_rpcLinks.Count == 0)
+                return;
+
+            ServerManager?.ReturnRpcLinks(_rpcLinks);
+            _rpcLinks.Clear();
+        }
 
         /// <summary>
         /// Writes rpcLinks to writer.
