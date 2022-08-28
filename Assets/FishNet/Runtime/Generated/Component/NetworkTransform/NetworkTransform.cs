@@ -20,7 +20,9 @@ namespace FishNet.Component.Transforming
 {
     /// <summary> 
     /// A somewhat basic but reliable NetworkTransform that will be improved upon greatly after release.
-    /// </summary>   
+    /// </summary>
+    [DisallowMultipleComponent]
+    [AddComponentMenu("FishNet/Component/NetworkTransform")]
     public class NetworkTransform : NetworkBehaviour
     {
         #region Types.
@@ -230,6 +232,7 @@ namespace FishNet.Component.Transforming
         /// </summary>
         public event Action OnInterpolationComplete;
         #endregion
+
         #region Serialized.
         /// <summary>
         /// True to synchronize when this transform changes parent.
@@ -261,7 +264,9 @@ namespace FishNet.Component.Transforming
         [Tooltip("How many ticks to extrapolate.")]
         [Range(0, 1024)]
         [SerializeField]
+#pragma warning disable CS0414 //Not in use.
         private ushort _extrapolation = 2;
+#pragma warning restore CS0414 //Not in use.
         /// <summary>
         /// True to enable teleport threshhold.
         /// </summary>
@@ -301,11 +306,21 @@ namespace FishNet.Component.Transforming
         [SerializeField]
         private bool _synchronizePosition = true;
         /// <summary>
+        /// Sets if to synchronize position.
+        /// </summary>
+        /// <param name="value">New value.</param>
+        public void SetSynchronizePosition(bool value) => _synchronizePosition = value;
+        /// <summary>
         /// Axes to snap on position.
         /// </summary>
         [Tooltip("Axes to snap on position.")]
         [SerializeField]
         private SnappedAxes _positionSnapping = new SnappedAxes();
+        /// <summary>
+        /// Sets which Position axes to snap.
+        /// </summary>
+        /// <param name="axes">Axes to snap.</param>
+        public void SetPositionSnapping(SnappedAxes axes) => _positionSnapping = axes;
         /// <summary>
         /// True to synchronize rotation. Even while checked only changed values are sent.
         /// </summary>
@@ -313,11 +328,21 @@ namespace FishNet.Component.Transforming
         [SerializeField]
         private bool _synchronizeRotation = true;
         /// <summary>
+        /// Sets if to synchronize rotation.
+        /// </summary>
+        /// <param name="value">New value.</param>
+        public void SetSynchronizeRotation(bool value) => _synchronizeRotation = value;
+        /// <summary>
         /// Axes to snap on rotation.
         /// </summary>
         [Tooltip("Axes to snap on rotation.")]
         [SerializeField]
         private SnappedAxes _rotationSnapping = new SnappedAxes();
+        /// <summary>
+        /// Sets which Scale axes to snap.
+        /// </summary>
+        /// <param name="axes">Axes to snap.</param>
+        public void SetRotationSnapping(SnappedAxes axes) => _rotationSnapping = axes;
         /// <summary>
         /// True to synchronize scale. Even while checked only changed values are sent.
         /// </summary>
@@ -325,11 +350,21 @@ namespace FishNet.Component.Transforming
         [SerializeField]
         private bool _synchronizeScale = true;
         /// <summary>
+        /// Sets if to synchronize scale.
+        /// </summary>
+        /// <param name="value">New value.</param>
+        public void SetSynchronizeScale(bool value) => _synchronizeScale = value;
+        /// <summary>
         /// Axes to snap on scale.
         /// </summary>
         [Tooltip("Axes to snap on scale.")]
         [SerializeField]
         private SnappedAxes _scaleSnapping = new SnappedAxes();
+        /// <summary>
+        /// Sets which Scale axes to snap.
+        /// </summary>
+        /// <param name="axes">Axes to snap.</param>
+        public void SetScaleSnapping(SnappedAxes axes) => _scaleSnapping = axes;
         #endregion
 
         #region Private.
@@ -428,7 +463,7 @@ namespace FishNet.Component.Transforming
             _interval = Math.Max(_interval, (byte)1);
         }
 
-        private void OnDisable()
+        private void OnDestroy()
         {
             if (_receivedClientData.Writer != null)
             {
@@ -1011,6 +1046,7 @@ namespace FishNet.Component.Transforming
                         * and it's thrown off. */
                         if (!HasChanged(td))
                             _queueReady = false;
+                        OnInterpolationComplete?.Invoke();
                         
                 }
             }
@@ -1562,6 +1598,22 @@ namespace FishNet.Component.Transforming
             else
             {
                 _goalDataQueue.Enqueue(nextGd);
+            }
+
+            /* If the queue is excessive beyond interpolation then
+             * dequeue extras to prevent from dropping behind too
+             * quickly. This shouldn't be an issue with normal movement
+             * as the NT speeds up if the buffer unexpectedly grows, but
+             * when connections are unstable results may come in chunks
+             * and for a better experience the older parts of the chunks
+             * will be dropped. */
+            if (_goalDataQueue.Count > (_interpolation + 3))
+            {
+                while (_goalDataQueue.Count > _interpolation)
+                {
+                    GoalData tmpGd = _goalDataQueue.Dequeue();
+                    _goalDataCache.Push(tmpGd);
+                }
             }
         }
 

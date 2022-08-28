@@ -45,18 +45,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  <IsNested>k__BackingField: 0
+  <ComponentIndex>k__BackingField: 0
   _networkBehaviours:
   - {fileID: 86458396355560673}
-  SceneTransformProperties:
-    Position: {x: 0, y: 0, z: 0}
-    Rotation: {x: 0, y: 0, z: 0, w: 1}
-    LocalScale: {x: 1, y: 1, z: 1}
+  <ParentNetworkObject>k__BackingField: {fileID: 0}
+  <ChildNetworkObjects>k__BackingField: []
   _isNetworked: 1
-  ChildNetworkObjects: []
+  _isGlobal: 0
+  _disableOnDespawn: 0
   NetworkObserver: {fileID: 0}
-  _prefabId: 9
+  <PrefabId>k__BackingField: -1
   _scenePathHash: 0
-  _sceneId: 0
+  <SceneId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 9108699489103310431
   _sceneNetworkObjects:
   - {fileID: 2252708202742244336}
 --- !u!114 &86458396355560673
@@ -77,4 +79,3 @@ MonoBehaviour:
   playerName: 
   ping: 0
   pawnPrefab: {fileID: 4937619767263221167, guid: aa314f6159a52e244905f1804d918dad, type: 3}
-  currentPawn: {fileID: 0}

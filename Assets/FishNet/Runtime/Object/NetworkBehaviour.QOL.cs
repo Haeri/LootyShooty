@@ -85,9 +85,10 @@ namespace FishNet.Object
         /// True if the local client is the owner of this object.
         /// </summary>
 #if UNITY_2020_3_OR_NEWER
-        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "OnStartServer")]
-        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "Awake")]
-        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "Start")]
+        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "OnStartServer", "")]
+        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "OnStartNetwork", " Use base.Owner.IsLocalClient instead.")]
+        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "Awake", "")]
+        [PreventUsageInside("global::FishNet.Object.NetworkBehaviour", "Start", "")]
 #endif
         public bool IsOwner => _networkObjectCache.IsOwner;
         /// <summary>
@@ -129,10 +130,11 @@ namespace FishNet.Object
         /// <summary>
         /// Despawns this _networkObjectCache. Can only be called on the server.
         /// </summary>
-        public void Despawn()
+        /// <param name="disableOnDespawnOverride">Overrides the default DisableOnDespawn value for this single despawn. Scene objects will never be destroyed.</param>
+        public void Despawn(bool? disableOnDespawnOverride = null)
         {
             if (!IsNetworkObjectNull(true))
-                _networkObjectCache.Despawn();
+                _networkObjectCache.Despawn(disableOnDespawnOverride);
         }
         /// <summary>
         /// Spawns an object over the network. Can only be called on the server.
