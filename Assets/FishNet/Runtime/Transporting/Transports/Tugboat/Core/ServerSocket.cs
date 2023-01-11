@@ -225,16 +225,18 @@ namespace FishNet.Transporting.Tugboat.Server
         /// <returns></returns>
         private NetPeer GetNetPeer(int connectionId, bool connectedOnly)
         {
-            NetPeer peer = null;
             if (_server != null)
             {
-                if (connectionId >= 0 || connectionId < _server.ConnectedPeersCount)
-                    peer = _server.GetPeerById(connectionId);
+                NetPeer peer = _server.GetPeerById(connectionId);
                 if (connectedOnly && peer != null && peer.ConnectionState != ConnectionState.Connected)
                     peer = null;
-            }
 
-            return peer;
+                return peer;
+            }
+            else
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -289,7 +291,8 @@ namespace FishNet.Transporting.Tugboat.Server
             try
             {
                 peer.Disconnect();
-                base.Transport.HandleRemoteConnectionState(new RemoteConnectionStateArgs(RemoteConnectionState.Stopped, connectionId, base.Transport.Index));
+                //Let LiteNetLib get the disconnect event which will enqueue a remote connection state.
+                //base.Transport.HandleRemoteConnectionState(new RemoteConnectionStateArgs(RemoteConnectionState.Stopped, connectionId, base.Transport.Index));
             }
             catch
             {

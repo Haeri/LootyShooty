@@ -28,11 +28,34 @@ namespace FishNet.Object
         public uint GetLastReconcileTick() => _lastReconcileTick;
         /// <summary>
         /// Sets the last tick this NetworkBehaviour reconciled with.
+        /// For internal use only.
         /// </summary>
         [CodegenMakePublic] //Internal only.
-        protected internal void SetLastReconcileTick(uint value)
+        protected internal void SetLastReconcileTickInternal(uint value)
         {
             _lastReconcileTick = value;
+            //Also set on the timemanager.
+            TimeManager.LastReconcileTick = value;
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        private uint _lastReplicateTick;
+        /// <summary>
+        /// Gets the last tick this NetworkBehaviour replicated with.
+        /// </summary>
+        public uint GetLastReplicateTick() => _lastReplicateTick;
+        /// <summary>
+        /// Sets the last tick this NetworkBehaviour replicated with.
+        /// For internal use only.
+        /// </summary>
+        [CodegenMakePublic] 
+        protected internal void SetLastReplicateTickInternal(uint value)
+        {
+            Owner.LocalReplicateTick = TimeManager.LocalTick;
+            _lastReplicateTick = value;
+            //Also set on the timemanager.
+            TimeManager.LastReplicateTick = value;
         }
         /// <summary>
         /// True if this object is reconciling.
@@ -81,9 +104,10 @@ namespace FishNet.Object
         /// </summary>
         /// <param name="hash"></param>
         /// <param name="del"></param>
-        [APIExclude] //codegen this can be made protected internal then set public via codegen
+        [APIExclude]
+        [CodegenMakePublic]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected internal void RegisterReplicateRpc(uint hash, ReplicateRpcDelegate del)
+        protected internal void RegisterReplicateRpcInternal(uint hash, ReplicateRpcDelegate del)
         {
             _replicateRpcDelegates[hash] = del;
         }
@@ -93,9 +117,10 @@ namespace FishNet.Object
         /// </summary>
         /// <param name="hash"></param>
         /// <param name="del"></param>
-        [APIExclude] //codegen this can be made protected internal then set public via codegen
+        [APIExclude]
+        [CodegenMakePublic]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected internal void RegisterReconcileRpc(uint hash, ReconcileRpcDelegate del)
+        protected internal void RegisterReconcileRpcInternal(uint hash, ReconcileRpcDelegate del)
         {
             _reconcileRpcDelegates[hash] = del;
         }
@@ -153,21 +178,31 @@ namespace FishNet.Object
         /// Clears cached replicates. This can be useful to call on server and client after teleporting.
         /// </summary>
         /// <param name="asServer">True to reset values for server, false to reset values for client.</param>
-        public void ClearReplicateCache(bool asServer) { InternalClearReplicateCache(asServer); }
+        public void ClearReplicateCache(bool asServer) { ClearReplicateCacheInternal(asServer); }
+        /// <summary>
+        /// Clears cached replicates for server and client. This can be useful to call on server and client after teleporting.
+        /// </summary>
+        public void ClearReplicateCache()
+        {
+            ClearReplicateCacheInternal(true);
+            ClearReplicateCacheInternal(false);
+        }
         /// <summary>
         /// Clears cached replicates.
         /// For internal use only.
         /// </summary>
         /// <param name="asServer"></param>
+        [CodegenMakePublic]
         [APIExclude]
-        protected internal virtual void InternalClearReplicateCache(bool asServer) { }
+        protected internal virtual void ClearReplicateCacheInternal(bool asServer) { }
 
         /// <summary>
         /// Writes number of past inputs from buffer to writer and sends it to the server.
         /// Internal use. 
-        /// </summary> //codegen can be made internal, then public via codegen
+        /// </summary>
+        [CodegenMakePublic]//internal.
         [APIExclude]
-        public void SendReplicateRpc<T>(uint hash, List<T> replicateBuffer, int count)
+        public void SendReplicateRpcInternal<T>(uint hash, List<T> replicateBuffer, int count)
         {
             if (!IsSpawnedWithWarning())
                 return;
@@ -185,7 +220,7 @@ namespace FishNet.Object
 
             Channel channel = Channel.Unreliable;
             //Write history to methodWriter.
-            PooledWriter methodWriter = WriterPool.GetWriter();
+            PooledWriter methodWriter = WriterPool.GetWriter(WriterPool.LENGTH_BRACKET);
             methodWriter.WriteList(replicateBuffer, offset);
 
             PooledWriter writer;
@@ -195,17 +230,18 @@ namespace FishNet.Object
             writer = CreateRpc(hash, methodWriter, PacketId.Replicate, channel);
             NetworkManager.TransportManager.SendToServer((byte)channel, writer.GetArraySegment(), false);
 
-            methodWriter.Dispose();
-            writer.Dispose();
+            methodWriter.DisposeLength();
+            writer.DisposeLength();
         }
 
         /// <summary>
         /// Sends a RPC to target.
         /// Internal use.
         /// </summary>
-        [APIExclude] //codegen this can be made internal then set public via codegen
+        [APIExclude]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SendReconcileRpc<T>(uint hash, T reconcileData, Channel channel)
+        [CodegenMakePublic] //internal.
+        public void SendReconcileRpcInternal<T>(uint hash, T reconcileData, Channel channel)
         {
             if (!IsSpawned)
                 return;

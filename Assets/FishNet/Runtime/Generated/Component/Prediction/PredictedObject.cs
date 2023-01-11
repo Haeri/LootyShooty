@@ -1,7 +1,10 @@
 ﻿using FishNet.Component.Transforming;
+using FishNet.Utility.Extension;
+using FishNet.Connection;
 using FishNet.Managing;
-using FishNet.Managing.Logging;
 using FishNet.Object;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FishNet.Component.Prediction
@@ -11,12 +14,13 @@ namespace FishNet.Component.Prediction
     {
         #region Types.
         /// <summary>
-        /// How to smooth. Over the tick duration or specified time.
+        /// State of this object in a collision.
         /// </summary>
-        public enum SmoothingDurationType : byte
+        private enum CollectionState : byte
         {
-            Tick = 0,
-            Time = 1
+            Unset = 0,
+            Added = 1,
+            Removed = 2,
         }
         /// <summary>
         /// Type of prediction movement being used.
@@ -26,6 +30,11 @@ namespace FishNet.Component.Prediction
             Other = 0,
             Rigidbody = 1,
             Rigidbody2D = 2
+        }
+        internal enum ResendType : byte
+        {
+            Disabled = 0,
+            Interval = 1,
         }
         #endregion
 
@@ -46,42 +55,18 @@ namespace FishNet.Component.Prediction
         /// <summary>
         /// Gets GraphicalObject.
         /// </summary>
-        public Transform GetGraphicalObject => _graphicalObject;
+        public Transform GetGraphicalObject() => _graphicalObject;
         /// <summary>
         /// Sets GraphicalObject.
         /// </summary>
         /// <param name="value"></param>
-        public void SetGraphicalObject(Transform value) => _graphicalObject = value;
-        /// <summary>
-        /// True to smooth graphical object over tick durations. While true objects will be smooth even with low tick rates, but the visual representation will be behind one tick.
-        /// </summary>
-        [Tooltip("True to smooth graphical object over tick durations. While true objects will be smooth even with low tick rates, but the visual representation will be behind one tick.")]
-        [SerializeField]
-        private bool _smoothTicks = true;
-        /// <summary>
-        /// Gets the value for SmoothTicks.
-        /// </summary>
-        /// <returns></returns>
-        public bool GetSmoothTicks() => _smoothTicks;
-        /// <summary>
-        /// Sets the value for SmoothTicks.
-        /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        public void SetSmoothTicks(bool value) => _smoothTicks = value;
-        /// <summary>
-        /// How to smooth desynchronizations. Tick will smooth over the tick while Time will smooth over a set duration.
-        /// </summary>
-        [Tooltip("How to smooth desynchronizations. Tick will smooth over the tick while Time will smooth over a set duration.")]
-        [SerializeField]
-        private SmoothingDurationType _durationType = SmoothingDurationType.Tick;
-        /// <summary>
-        /// Duration to smooth desynchronizations over.
-        /// </summary>
-        [Tooltip("Duration to smooth desynchronizations over.")]
-        [Range(0.01f, 0.5f)]
-        [SerializeField]
-        private float _smoothingDuration = 0.125f;
+        public void SetGraphicalObject(Transform value)
+        {
+            _graphicalObject = value;
+            SetInstantiatedOffsetValues();
+            _spectatorSmoother?.SetGraphicalObject(value);
+            _ownerSmoother?.SetGraphicalObject(value);
+        }
         /// <summary>
         /// True to enable teleport threshhold.
         /// </summary>
@@ -92,9 +77,52 @@ namespace FishNet.Component.Prediction
         /// How far the transform must travel in a single update to cause a teleport rather than smoothing. Using 0f will teleport every update.
         /// </summary>
         [Tooltip("How far the transform must travel in a single update to cause a teleport rather than smoothing. Using 0f will teleport every update.")]
-        [Range(0f, float.MaxValue)]
+        [Range(0f, 200f)] //Unity bug? Values ~over 200f lose decimal display within inspector.
         [SerializeField]
         private float _teleportThreshold = 1f;
+        /// <summary>
+        /// Gets the value for SmoothTicks.
+        /// </summary>
+        /// <returns></returns>
+        [Obsolete("Use GetInterpolation. This method no longer functions.")]
+        public bool GetSmoothTicks() => true;
+        /// <summary>
+        /// Sets the value for SmoothTicks.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        [Obsolete("Use SetInterpolation. This method no longer functions.")]
+        public void SetSmoothTicks(bool value) { }
+        /// <summary>
+        /// How far in the past to keep the graphical object when owner. Using a value of 0 will disable interpolation.
+        /// </summary>
+        [Tooltip("How far in the past to keep the graphical object when owner. Using a value of 0 will disable interpolation.")]
+        [Range(0, 255)]
+        [SerializeField]
+        private byte _ownerInterpolation = 1;
+        /// <summary>
+        /// Gets the iterpolation value to use when the owner of this object.
+        /// </summary>
+        /// <param name="asOwner">True to get the interpolation for when owner, false to get the interpolation for when a spectator.</param>
+        public byte GetInterpolation(bool asOwner) => (asOwner) ? _ownerInterpolation : _spectatorInterpolation;
+        /// <summary>
+        /// Sets the interpolation value to use when the owner of this object.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="asOwner">True to set the interpolation for when owner, false to set interpolation for when a spectator.</param>
+        public void SetInterpolation(byte value, bool asOwner)
+        {
+            if (asOwner)
+            {
+                _ownerInterpolation = value;
+                _ownerSmoother?.SetInterpolation(value);
+            }
+            else
+            {
+                _spectatorInterpolation = value;
+                _spectatorSmoother?.SetInterpolation(value);
+            }
+        }
         /// <summary>
         /// Type of prediction movement which is being used.
         /// </summary>
@@ -114,18 +142,53 @@ namespace FishNet.Component.Prediction
         [SerializeField]
         private Rigidbody2D _rigidbody2d;
         /// <summary>
+        /// Time to smooth initial velocities when an object was previously stopped.
+        /// </summary>
+        [Tooltip("Time to smooth initial velocities when an object was previously stopped.")]
+        [Range(0f, 3f)]
+        [SerializeField]
+        private float _spectatorSmoothingDuration = 0.025f;
+        /// <summary>
+        /// How far in the past to keep the graphical object when not owner. Using a value of 0 will disable interpolation.
+        /// </summary>
+        [Tooltip("How far in the past to keep the graphical object when not owner. Using a value of 0 will disable interpolation.")]
+        [Range(0, 255)]
+        [SerializeField]
+        private byte _spectatorInterpolation = 1;
+        /// <summary>
+        /// Multiplier to apply to movement speed when buffer is over interpolation.
+        /// </summary>
+        [Tooltip("Multiplier to apply to movement speed when buffer is over interpolation.")]
+        [Range(0f, 5f)]
+        [SerializeField]
+        private float _overflowMultiplier = 0.1f;
+        /// <summary>
+        /// Multiplier applied to difference in velocity between ticks.
+        /// Positive values will result in more velocity while lowers will result in less.
+        /// A value of 1f will prevent any velocity from being lost between ticks, unless indicated by the server.
+        /// </summary>
+        [Tooltip("Multiplier applied to difference in velocity between ticks. Positive values will result in more velocity while lowers will result in less. A value of 1f will prevent any velocity from being lost between ticks, unless indicated by the server.")]
+        [Range(-10f, 10f)]
+        [SerializeField]
+        private float _maintainedVelocity = 0f;
+        /// <summary>
+        /// How often to resend current values regardless if the state has changed. Using this value will consume more bandwidth but may be preferred if you want to force synchronization the object move on the client but not on the server.
+        /// </summary>
+        [Tooltip("How often to resend current values regardless if the state has changed. Using this value will consume more bandwidth but may be preferred if you want to force synchronization the object move on the client but not on the server.")]
+        [SerializeField]
+        private ResendType _resendType = ResendType.Disabled;
+        /// <summary>
+        /// How often in ticks to resend values.
+        /// </summary>
+        [Tooltip("How often in ticks to resend values.")]
+        [SerializeField]
+        private ushort _resendInterval = 30;
+        /// <summary>
         /// NetworkTransform to configure.
         /// </summary>
         [Tooltip("NetworkTransform to configure.")]
         [SerializeField]
         private NetworkTransform _networkTransform;
-        /// <summary>
-        /// How much of the previous velocity to retain when predicting. Default value is 0f. Increasing this value may result in overshooting with rigidbodies that do not behave naturally, such as controllers or vehicles.
-        /// </summary>
-        [Tooltip("How much of the previous velocity to retain when predicting. Default value is 0f. Increasing this value may result in overshooting with rigidbodies that do not behave naturally, such as controllers or vehicles.")]
-        [Range(0f, 1f)]
-        [SerializeField]
-        private float _predictionRatio = 0f;
         #endregion
 
         #region Private.
@@ -134,56 +197,38 @@ namespace FishNet.Component.Prediction
         /// </summary>
         private bool _subscribed;
         /// <summary>
-        /// Next tick to send data.
+        /// GraphicalObject position difference from this object when this is instantiated.
         /// </summary>
-        private uint _nextSendTick;
+        private Vector3 _graphicalInstantiatedOffsetPosition;
         /// <summary>
-        /// World position before transform was predicted or reset.
+        /// GraphicalObject rotation difference from this object when this is instantiated.
         /// </summary>
-        private Vector3 _previousPosition;
+        private Quaternion _graphicalInstantiatedOffsetRotation;
         /// <summary>
-        /// World rotation before transform was predicted or reset.
+        /// PredictedObjects that are spawned for each NetworkManager.
+        /// Ideally PredictedObjects will be under the RollbackManager but that requires cross-linking assemblies which isn't possible.
+        /// Until codegen can be made to run on the Runtime folder without breaking user code updates this will have to do.
         /// </summary>
-        private Quaternion _previousRotation;
+        [System.NonSerialized]
+        private static Dictionary<NetworkManager, List<PredictedObject>> _predictedObjects = new Dictionary<NetworkManager, List<PredictedObject>>();
         /// <summary>
-        /// Local position of transform when instantiated.
+        /// Current state of this PredictedObject within PredictedObjects collection.
         /// </summary>
-        private Vector3 _instantiatedLocalPosition;
+        private CollectionState _collectionState = CollectionState.Unset;
         /// <summary>
-        /// How quickly to move towards TargetPosition.
+        /// Smoothing component for this object when not owner.
         /// </summary>
-        private float _positionMoveRate = -2;
+        private PredictedObjectSpectatorSmoother _spectatorSmoother;
         /// <summary>
-        /// Local rotation of transform when instantiated.
+        /// Smoothing component for this object when owner.
+        /// This component is also used for non-owned objects when as server.
         /// </summary>
-        private Quaternion _instantiatedLocalRotation;
-        /// <summary>
-        /// How quickly to move towards TargetRotation.
-        /// </summary>
-        private float _rotationMoveRate = -2;
-        #endregion
-
-        #region Consts.
-        /// <summary>
-        /// How often to synchronize values from server to clients when no changes have been detected.
-        /// </summary>
-        protected const float SEND_INTERVAL = 1f;
+        private PredictedObjectOwnerSmoother _ownerSmoother;
         #endregion
 
         private void Awake()
         {
-            if (Application.isPlaying)
-            {
-                if (!InitializeOnce())
-                {
-                    this.enabled = false;
-                    return;
-                }
-            }
-
-            ConfigureNetworkTransform();
-            //Set in awake so they are default.
-            SetPreviousTransformProperties();
+            SetInstantiatedOffsetValues();
         }
 
         private void OnEnable()
@@ -195,20 +240,48 @@ namespace FishNet.Component.Prediction
              * it's initialized. */
             if (base.IsClient)
                 ChangeSubscriptions(true);
+
+            if (_predictionType != PredictionType.Other)
+                InstantiatedRigidbodyCountInternal++;
         }
         private void OnDisable()
         {
             //Only unsubscribe if client.
             if (base.IsClient)
                 ChangeSubscriptions(false);
+
+            if (_predictionType != PredictionType.Other)
+                InstantiatedRigidbodyCountInternal--;
         }
 
         public override void OnStartNetwork()
         {
             base.OnStartNetwork();
+
+            ConfigureRigidbodies();
+            ConfigureNetworkTransform();
+
+            if (base.IsServer)
+            {
+                _collectionState = CollectionState.Added;
+                List<PredictedObject> collection;
+                //Add new list to dictionary collection if needed.
+                if (!_predictedObjects.TryGetValue(base.NetworkManager, out collection))
+                {
+                    collection = new List<PredictedObject>();
+                    _predictedObjects.Add(base.NetworkManager, collection);
+                }
+
+                collection.Add(this);
+            }
+
             base.TimeManager.OnPostTick += TimeManager_OnPostTick;
-            _instantiatedLocalPosition = _graphicalObject.localPosition;
-            _instantiatedLocalRotation = _graphicalObject.localRotation;
+        }
+
+        public override void OnSpawnServer(NetworkConnection connection)
+        {
+            base.OnSpawnServer(connection);
+            Rigidbodies_OnSpawnServer(connection);
         }
 
         public override void OnStartClient()
@@ -217,57 +290,124 @@ namespace FishNet.Component.Prediction
             ChangeSubscriptions(true);
         }
 
+        public override void OnOwnershipClient(NetworkConnection prevOwner)
+        {
+            base.OnOwnershipClient(prevOwner);
+            /* If owner or host then use the
+             * owner smoother. The owner smoother
+             * is not predictive and is preferred
+             * for more real time graphical results. */
+            if (base.IsOwner || base.IsHost)
+                InitializeSmoother(true);
+            //Not owner nor server, initialize spectator smoother if using rigidbodies.
+            else if (_predictionType != PredictionType.Other)
+                InitializeSmoother(false);
+        }
+
         public override void OnStopClient()
         {
             base.OnStopClient();
             ChangeSubscriptions(false);
         }
+
         public override void OnStopNetwork()
         {
             base.OnStopNetwork();
+            if (base.IsServer)
+            {
+                if (_collectionState == CollectionState.Added)
+                {
+                    if (_predictedObjects.TryGetValue(base.NetworkManager, out List<PredictedObject> collection))
+                    {
+                        _collectionState = CollectionState.Removed;
+                        collection.Remove(this);
+                        if (collection.Count == 0)
+                            _predictedObjects.Remove(base.NetworkManager);
+                    }
+                }
+            }
+
             if (base.TimeManager != null)
                 base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
         }
 
-        private void Update()
+        private void OnDestroy()
         {
-            MoveToTarget();
+            RemoveFromPredictedObjects();
+        }
+
+        /// <summary>
+        /// Sets instantiated offset values for the graphical object.
+        /// </summary>
+        private void SetInstantiatedOffsetValues()
+        {
+            transform.SetTransformOffsets(_graphicalObject, ref _graphicalInstantiatedOffsetPosition, ref _graphicalInstantiatedOffsetRotation);
+        }
+
+        /// <summary>
+        /// Removes this script from _predictedObjects.
+        /// </summary>
+        private void RemoveFromPredictedObjects()
+        {
+            //Already removed.
+            if (_collectionState != CollectionState.Added)
+                return;
+
+            NetworkManager nm = base.NetworkManager;
+            //If found then remove normally.
+            if (nm != null)
+            {
+                if (_predictedObjects.TryGetValue(base.NetworkManager, out List<PredictedObject> collection))
+                {
+                    _collectionState = CollectionState.Removed;
+                    collection.Remove(this);
+                    if (collection.Count == 0)
+                        _predictedObjects.Remove(base.NetworkManager);
+                }
+            }
+            //NetworkManager isn't found, must check all entries. This would only happen if object didnt clean up from network properly.
+            else
+            {
+                List<NetworkManager> removedEntries = new List<NetworkManager>();
+                foreach (KeyValuePair<NetworkManager, List<PredictedObject>> item in _predictedObjects)
+                {
+                    NetworkManager key = item.Key;
+                    if (key == null)
+                    {
+                        removedEntries.Add(key);
+                    }
+                    else
+                    {
+                        List<PredictedObject> collection = item.Value;
+                        collection.Remove(this);
+                        if (collection.Count == 0)
+                            removedEntries.Add(key);
+                    }
+                }
+
+                //Remove entries as needed.
+                for (int i = 0; i < removedEntries.Count; i++)
+                    _predictedObjects.Remove(removedEntries[i]);
+            }
+        }
+
+        private void TimeManager_OnUpdate()
+        {
+            _spectatorSmoother?.ManualUpdate();
+            _ownerSmoother?.ManualUpdate();
         }
 
         private void TimeManager_OnPreTick()
         {
-            if (CanSmooth())
-            {
-                /* Only snap to destination if using tick smoothing.
-                 * This ensures the graphics will be at the proper location
-                 * before the next movement rates are calculated. */
-                if (_durationType == SmoothingDurationType.Tick)
-                {
-                    _graphicalObject.localPosition = _instantiatedLocalPosition;
-                    _graphicalObject.localRotation = _instantiatedLocalRotation;
-                }
-                SetPreviousTransformProperties();
-            }
+            _spectatorSmoother?.OnPreTick();
+            _ownerSmoother?.OnPreTick();
         }
 
         protected void TimeManager_OnPostTick()
         {
-            if (CanSmooth())
-            {
-                ResetToTransformPreviousProperties();
-                SetTransformMoveRates();
-            }
+            _spectatorSmoother?.OnPostTick();
+            _ownerSmoother?.OnPostTick();
             Rigidbodies_TimeManager_OnPostTick();
-        }
-
-
-        /// <summary>
-        /// Called before physics is simulated when replaying a replicate method.
-        /// Contains the PhysicsScene and PhysicsScene2D which was simulated.
-        /// </summary>
-        protected virtual void TimeManager_OnPostReplicateReplay(PhysicsScene ps, PhysicsScene2D ps2d)
-        {
-            Rigidbodies_TimeManager_OnPostReplicateReplay(ps, ps2d);
         }
 
 
@@ -284,140 +424,109 @@ namespace FishNet.Component.Prediction
 
             if (subscribe)
             {
+                base.TimeManager.OnUpdate += TimeManager_OnUpdate;
                 base.TimeManager.OnPreTick += TimeManager_OnPreTick;
+                base.TimeManager.OnPreReplicateReplay += TimeManager_OnPreReplicateReplay;
                 base.TimeManager.OnPostReplicateReplay += TimeManager_OnPostReplicateReplay;
+                base.TimeManager.OnPreReconcile += TimeManager_OnPreReconcile;
+                base.TimeManager.OnPostReconcile += TimeManager_OnPostReconcile;
             }
             else
             {
+                base.TimeManager.OnUpdate -= TimeManager_OnUpdate;
                 base.TimeManager.OnPreTick -= TimeManager_OnPreTick;
+                base.TimeManager.OnPreReplicateReplay -= TimeManager_OnPreReplicateReplay;
                 base.TimeManager.OnPostReplicateReplay -= TimeManager_OnPostReplicateReplay;
+                base.TimeManager.OnPreReconcile -= TimeManager_OnPreReconcile;
+                base.TimeManager.OnPostReconcile -= TimeManager_OnPostReconcile;
             }
 
             _subscribed = subscribe;
         }
 
-
         /// <summary>
-        /// Initializes this script for use. Returns true for success.
+        /// Called before physics is simulated when replaying a replicate method.
+        /// Contains the PhysicsScene and PhysicsScene2D which was simulated.
         /// </summary>
-        private bool InitializeOnce()
+        protected virtual void TimeManager_OnPreReplicateReplay(PhysicsScene ps, PhysicsScene2D ps2d)
         {
-            //No graphical object, cannot smooth.
-            if (_graphicalObject == null)
-            {
-                if (NetworkManager.StaticCanLog(LoggingType.Error))
-                    Debug.LogError($"GraphicalObject is not set on {gameObject.name}. Initialization will fail.");
-                return false;
-            }
-
-            return true;
-        }
-
-
-        /// <summary>
-        /// Returns if prediction can be used on this rigidbody.
-        /// </summary>
-        /// <returns></returns>
-        private bool CanSmooth()
-        {
-            if (!_smoothTicks)
-                return false;
-            //Only client needs smoothing.
-            if (base.IsServerOnly)
-                return false;
-
-            return true;
+            Rigidbodies_TimeManager_OnPreReplicateReplay(ps, ps2d);
         }
 
         /// <summary>
-        /// Moves transform to target values.
+        /// Called after physics is simulated when replaying a replicate method.
+        /// Contains the PhysicsScene and PhysicsScene2D which was simulated.
         /// </summary>
-        private void MoveToTarget()
+        private void TimeManager_OnPostReplicateReplay(PhysicsScene arg1, PhysicsScene2D arg2)
         {
-            //Not set, meaning movement doesnt need to happen or completed.
-            if (_positionMoveRate == -2f && _rotationMoveRate == -2f)
-                return;
-
-            /* Only try to update properties if they have a valid move rate.
-             * Properties may have 0f move rate if they did not change. */
-
-            Transform t = _graphicalObject;
-            float delta = Time.deltaTime;
-            //Position.
-            if (_positionMoveRate == -1f)
-                t.localPosition = _instantiatedLocalPosition;
-            else if (_positionMoveRate > 0f)
-                t.localPosition = Vector3.MoveTowards(t.localPosition, _instantiatedLocalPosition, _positionMoveRate * delta);
-            //Rotation.
-            if (_rotationMoveRate == -1f)
-                t.localRotation = _instantiatedLocalRotation;
-            else if (_rotationMoveRate > 0f)
-                t.localRotation = Quaternion.RotateTowards(t.localRotation, _instantiatedLocalRotation, _rotationMoveRate * delta);
-
-            if (GraphicalObjectMatches(_instantiatedLocalPosition, _instantiatedLocalRotation))
-            {
-                _positionMoveRate = -2f;
-                _rotationMoveRate = -2f;
-            }
+            _spectatorSmoother?.OnPostReplay();
         }
 
+        /// <summary>
+        /// Called before performing a reconcile on NetworkBehaviour.
+        /// </summary>
+        private void TimeManager_OnPreReconcile(NetworkBehaviour nb)
+        {
+            Rigidbodies_TimeManager_OnPreReconcile(nb);
+        }
 
         /// <summary>
-        /// Sets Position and Rotation move rates to reach Target datas.
+        /// Called after performing a reconcile on a NetworkBehaviour.
         /// </summary>
-        /// <param name="durationOverride">Smooth of this duration when not set to -1f. Otherwise TimeManager.TickDelta is used.</param>
-        private void SetTransformMoveRates()
+        private void TimeManager_OnPostReconcile(NetworkBehaviour nb)
         {
-            float timeManagerDelta = (float)base.TimeManager.TickDelta;
-            float delta = (_durationType == SmoothingDurationType.Tick) ? timeManagerDelta : _smoothingDuration;
-            /* delta can never be faster than tick rate, otherwise the object will always 
-             * get to smoothing goal before the next tick. */
-            if (delta < timeManagerDelta)
-                delta = timeManagerDelta;
+            Rigidbodies_TimeManager_OnPostReconcile(nb);
+        }
 
-            float distance;
-            distance = Vector3.Distance(_instantiatedLocalPosition, _graphicalObject.localPosition);
-            //If qualifies for teleporting.
-            if (_enableTeleport && distance >= _teleportThreshold)
+        /// <summary>
+        /// Initializes a smoother with configured values.
+        /// </summary>
+        private void InitializeSmoother(bool ownerSmoother)
+        {
+            ResetGraphicalTransform();
+
+            if (ownerSmoother)
             {
-                _positionMoveRate = -1f;
-                _rotationMoveRate = -1f;
+                _ownerSmoother = new PredictedObjectOwnerSmoother();
+                float teleportThreshold = (_enableTeleport) ? _teleportThreshold : -1f;
+                _ownerSmoother.Initialize(this, _graphicalInstantiatedOffsetPosition, _graphicalInstantiatedOffsetRotation, _graphicalObject, _ownerInterpolation, teleportThreshold);
             }
-            //Smoothing.
             else
             {
-                _positionMoveRate = (distance / delta);
-                distance = Quaternion.Angle(_instantiatedLocalRotation, _graphicalObject.localRotation);
-                if (distance > 0f)
-                    _rotationMoveRate = (distance / delta);
+                _spectatorSmoother = new PredictedObjectSpectatorSmoother();
+                RigidbodyType rbType = (_predictionType == PredictionType.Rigidbody) ?
+                    RigidbodyType.Rigidbody : RigidbodyType.Rigidbody2D;
+                float teleportThreshold = (_enableTeleport) ? _teleportThreshold : -1f;
+                _spectatorSmoother.Initialize(this, rbType, _rigidbody, _rigidbody2d, _graphicalObject, _spectatorSmoothingDuration, _spectatorInterpolation, _overflowMultiplier, teleportThreshold);
+
+            }
+
+            void ResetGraphicalTransform()
+            {
+                _graphicalObject.position = (transform.position + _graphicalInstantiatedOffsetPosition);
+                _graphicalObject.rotation = (_graphicalInstantiatedOffsetRotation * transform.rotation);
             }
         }
 
-
         /// <summary>
-        /// Caches the transforms current position and rotation.
+        /// Configures RigidbodyPauser with settings.
         /// </summary>
-        private void SetPreviousTransformProperties()
+        private void ConfigureRigidbodies()
         {
-            _previousPosition = _graphicalObject.position;
-            _previousRotation = _graphicalObject.rotation;
-        }
+            if (!IsRigidbodyPrediction)
+                return;
 
-        /// <summary>
-        /// Resets the transform to cached position and rotation of the transform.
-        /// </summary>
-        private void ResetToTransformPreviousProperties()
-        {
-            _graphicalObject.SetPositionAndRotation(_previousPosition, _previousRotation);
-        }
-
-        /// <summary>
-        /// Returns if this transform matches arguments.
-        /// </summary>
-        /// <returns></returns>
-        protected bool GraphicalObjectMatches(Vector3 position, Quaternion rotation)
-        {
-            return (_graphicalObject.localPosition == position && _graphicalObject.localRotation == rotation);
+            _rigidbodyPauser = new RigidbodyPauser();
+            if (_predictionType == PredictionType.Rigidbody)
+            {
+                _rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                _rigidbodyPauser.UpdateRigidbodies(transform, RigidbodyType.Rigidbody, true);
+            }
+            else
+            {
+                _rigidbody2d.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+                _rigidbodyPauser.UpdateRigidbodies(transform, RigidbodyType.Rigidbody2D, true);
+            }
         }
 
         /// <summary>
@@ -425,7 +534,7 @@ namespace FishNet.Component.Prediction
         /// </summary>
         private void ConfigureNetworkTransform()
         {
-            if (_predictionType == PredictionType.Other)
+            if (!IsRigidbodyPrediction)
                 _networkTransform?.ConfigureForCSP();
         }
 
@@ -433,11 +542,11 @@ namespace FishNet.Component.Prediction
 #if UNITY_EDITOR
         protected override void OnValidate()
         {
-            if (_graphicalObject != null && _graphicalObject.parent == null)
+            if (Application.isPlaying)
             {
-                Debug.LogError($"The graphical object may not be the root of the transform. Your graphical objects must be beneath your prediction scripts so that they may be smoothed independently during desynchronizations.");
-                _graphicalObject = null;
-                return;
+                InitializeSmoother(true);
+                if (_predictionType != PredictionType.Other)
+                    InitializeSmoother(false);
             }
 
             ConfigureNetworkTransform();
