@@ -8,74 +8,61 @@ on:
   workflow_dispatch:
 
 jobs:
-  buildAll:
-    name: Build ${{ matrix.targetPlatform }}
+  build:
+    name: Build ${{ matrix.artifactName }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        targetPlatform:
-          - OSX
-          - Windows64
-          - Linux64
+        include:
+          - targetPlatform: StandaloneWindows64
+            artifactName: LootyShooty-Windows64
+          - targetPlatform: StandaloneOSX
+            artifactName: LootyShooty-OSX
+          - targetPlatform: StandaloneLinux64
+            artifactName: LootyShooty-Linux64
+          - targetPlatform: StandaloneLinux64
+            artifactName: LootyShooty-Server-Linux64
+            extraArgs: -standaloneBuildSubtarget Server
+            modules: linux-server
     steps:
       - name: Download Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           lfs: true
-      - name: Check Cache
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-${{ matrix.targetPlatform }}
-          restore-keys: Library-
-      - name: Build Project
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          buildName: LootyShooty-${{ matrix.targetPlatform }}
-          buildsPath: build
-          targetPlatform: Standalone${{ matrix.targetPlatform }}
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: LootyShooty-${{ matrix.targetPlatform }}
-          path: build
 
-  buildServer:
-    name: Build Server Linux64
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-      - name: Check Cache
+      - name: Cache Library
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-Server-StandaloneLinux64
-          restore-keys: Library-Server-
-      - name: Build Project
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          key: Library-${{ matrix.artifactName }}-${{ hashFiles('Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-${{ matrix.artifactName }}-
+            Library-
+
+      - name: Install Unity
+        uses: buildalon/unity-setup@v2
         with:
-          # -EnableHeadlessMode is gone in modern Unity; dedicated servers
-          # are a standalone build subtarget instead.
-          customParameters: -standaloneBuildSubtarget Server
-          buildName: LootyShooty-Server-Linux64
-          buildsPath: build
-          targetPlatform: StandaloneLinux64
+          version-file: ProjectSettings/ProjectVersion.txt
+          build-targets: ${{ matrix.targetPlatform }}
+          modules: ${{ matrix.modules }}
+
+      - name: Activate Unity License
+        uses: buildalon/activate-unity-license@v2
+        with:
+          license: 'Personal'
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Build Project
+        uses: buildalon/unity-action@v3
+        with:
+          log-name: ${{ matrix.artifactName }}
+          build-target: ${{ matrix.targetPlatform }}
+          args: -quit -batchmode -executeMethod CIBuild.Build -buildPath build/${{ matrix.artifactName }} -buildName ${{ matrix.artifactName }} ${{ matrix.extraArgs }}
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: LootyShooty-Server-Linux64
-          path: build
+          name: ${{ matrix.artifactName }}
+          path: build/${{ matrix.artifactName }}
