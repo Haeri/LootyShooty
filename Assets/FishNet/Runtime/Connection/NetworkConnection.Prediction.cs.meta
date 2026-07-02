@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d0e78067e3f86c646b3f61744e7ef404
+guid: a0068eb93a417a44b9151b61a08d8547
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
@@ -9,3 +9,10 @@ MonoImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 207815
+  packageName: 'FishNet: Networking Evolved'
+  packageVersion: 4.7.2R
+  assetPath: Assets/FishNet/Runtime/Connection/NetworkConnection.Prediction.cs
+  uploadId: 901598

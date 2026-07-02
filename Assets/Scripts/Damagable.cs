@@ -8,8 +8,7 @@ using System;
 public class Damagable : NetworkBehaviour
 {
     public int maxHealth = 100;
-    [SyncVar]
-    public int health = 100;
+    public readonly SyncVar<int> health = new(100);
 
     public GameObject hitEffect;
     public bool isPenetrable;
@@ -19,22 +18,22 @@ public class Damagable : NetworkBehaviour
 
     public bool IsDead()
     {
-        return health <= 0;
+        return health.Value <= 0;
     }
 
     public bool TakeDamage(int amount)
     {
-        if (health == 0)
+        if (health.Value == 0)
         {
             return false;
         }
 
-        health -= amount;
+        health.Value -= amount;
         OnDamage?.Invoke(amount);
         
-        if(health < 0)
+        if(health.Value < 0)
         {
-            health = 0;
+            health.Value = 0;
             OnDeath?.Invoke();
             return true;
         }
@@ -44,7 +43,7 @@ public class Damagable : NetworkBehaviour
 
     public void ResetHealth()
     {
-        health = maxHealth;   
+        health.Value = maxHealth;
     }
 
 }

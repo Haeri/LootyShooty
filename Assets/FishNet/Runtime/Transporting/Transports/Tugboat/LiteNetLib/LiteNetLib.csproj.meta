@@ -1,7 +1,14 @@
 fileFormatVersion: 2
-guid: 2ad85b0f43f25f1499c27a4dca23ddd8
+guid: 1ec83424c5410b04aab06dddca60e7f6
 DefaultImporter:
   externalObjects: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 207815
+  packageName: 'FishNet: Networking Evolved'
+  packageVersion: 4.7.2R
+  assetPath: Assets/FishNet/Runtime/Transporting/Transports/Tugboat/LiteNetLib/LiteNetLib.csproj
+  uploadId: 901598

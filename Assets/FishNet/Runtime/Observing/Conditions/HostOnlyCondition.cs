@@ -13,18 +13,13 @@ namespace FishNet.Component.Observing
             /* Only return true if connection is the local client.
              * This check only runs on the server, so if local client
              * is true then they must also be the server (clientHost). */
-            return (base.NetworkObject.ClientManager.Connection == connection);
+            return NetworkObject.ClientManager.Connection == connection;
         }
 
-        public override bool Timed()
-        {
-            return false;
-        }
-
-        public override ObserverCondition Clone()
-        {
-            HostOnlyCondition copy = ScriptableObject.CreateInstance<HostOnlyCondition>();
-            return copy;
-        }
+        /// <summary>
+        /// How a condition is handled.
+        /// </summary>
+        /// <returns></returns>
+        public override ObserverConditionType GetConditionType() => ObserverConditionType.Normal;
     }
 }

@@ -1,11 +1,10 @@
-﻿using FishNet.Managing.Timing;
+﻿using FishNet.Managing.Predicting;
 using UnityEngine;
 
 namespace FishNet.Component.Prediction
 {
     public partial class OfflineRigidbody : MonoBehaviour
     {
-
         #region Serialized.
         /// <summary>
         /// Type of prediction movement which is being used.
@@ -25,19 +24,17 @@ namespace FishNet.Component.Prediction
         /// <summary>
         /// Pauser for rigidbodies.
         /// </summary>
-        private RigidbodyPauser _rigidbodyPauser = new RigidbodyPauser();
+        private RigidbodyPauser _rigidbodyPauser = new();
         /// <summary>
         /// TimeManager subscribed to.
         /// </summary>
-        private TimeManager _timeManager;
+        private PredictionManager _predictionManager;
         #endregion
-
 
         private void Awake()
         {
             InitializeOnce();
         }
-
 
         private void OnDestroy()
         {
@@ -49,24 +46,24 @@ namespace FishNet.Component.Prediction
         /// </summary>
         private void InitializeOnce()
         {
-            _timeManager = InstanceFinder.TimeManager;
+            _predictionManager = InstanceFinder.PredictionManager;
             UpdateRigidbodies();
             ChangeSubscription(true);
         }
 
         /// <summary>
-        /// Sets a new TimeManager to use.
+        /// Sets a new PredictionManager to use.
         /// </summary>
-        /// <param name="tm"></param>
-        public void SetTimeManager(TimeManager tm)
+        /// <param name = "tm"></param>
+        public void SetPredictionManager(PredictionManager pm)
         {
-            if (tm == _timeManager)
+            if (pm == _predictionManager)
                 return;
 
-            //Unsub from current.
+            // Unsub from current.
             ChangeSubscription(false);
-            //Sub to newest.
-            _timeManager = tm;
+            // Sub to newest.
+            _predictionManager = pm;
             ChangeSubscription(true);
         }
 
@@ -83,33 +80,29 @@ namespace FishNet.Component.Prediction
         /// </summary>
         private void ChangeSubscription(bool subscribe)
         {
-            if (_timeManager == null)
+            if (_predictionManager == null)
                 return;
 
             if (subscribe)
             {
-                _timeManager.OnPreReconcile += _timeManager_OnPreReconcile;
-                _timeManager.OnPostTick += _timeManager_OnPostTick;
+                _predictionManager.OnPreReconcile += _predictionManager_OnPreReconcile;
+                _predictionManager.OnPostReconcile += _predictionManager_OnPostReconcile;
             }
             else
             {
-                _timeManager.OnPreReconcile -= _timeManager_OnPreReconcile;
-                _timeManager.OnPostTick -= _timeManager_OnPostTick;
+                _predictionManager.OnPreReconcile -= _predictionManager_OnPreReconcile;
+                _predictionManager.OnPostReconcile -= _predictionManager_OnPostReconcile;
             }
         }
 
-        private void _timeManager_OnPreReconcile(Object.NetworkBehaviour obj)
+        private void _predictionManager_OnPreReconcile(uint clientTick, uint serverTick)
         {
-            //Make rbs all kinematic/!simulated before reconciling, which would also result in replays.
             _rigidbodyPauser.Pause();
         }
 
-        private void _timeManager_OnPostTick()
+        private void _predictionManager_OnPostReconcile(uint clientTick, uint serverTick)
         {
             _rigidbodyPauser.Unpause();
         }
-
     }
-
-
 }

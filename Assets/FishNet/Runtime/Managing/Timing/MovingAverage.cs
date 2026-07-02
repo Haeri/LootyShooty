@@ -1,18 +1,20 @@
 ﻿using FishNet.Documenting;
 using System;
-using UnityEngine;
 
 namespace FishNet.Managing.Timing
 {
-
     [APIExclude]
-    public class MovingAverage
+    public class MovingAverage : IDisposable
     {
         #region Public.
         /// <summary>
         /// Average from samples favoring the most recent sample.
         /// </summary>
         public float Average { get; private set; }
+        /// <summary>
+        /// Sample size being used.
+        /// </summary>
+        public int SampleSize { get; private set; }
         #endregion
 
         /// <summary>
@@ -34,19 +36,20 @@ namespace FishNet.Managing.Timing
 
         public MovingAverage(int sampleSize)
         {
-            if (sampleSize < 0)
-                sampleSize = 0;
-            else if (sampleSize < 2)
-                NetworkManager.StaticLogWarning("Using a sampleSize of less than 2 will always return the most recent value as Average.");
+            if (sampleSize < 2)
+            {
+                NetworkManagerExtensions.LogWarning("Using a sampleSize of less than 2 will always return the most recent value as Average.");
+                sampleSize = 1;
+            }
 
+            SampleSize = sampleSize;
             _samples = new float[sampleSize];
         }
-
 
         /// <summary>
         /// Computes a new windowed average each time a new sample arrives
         /// </summary>
-        /// <param name="newSample"></param>
+        /// <param name = "newSample"></param>
         public void ComputeAverage(float newSample)
         {
             if (_samples.Length <= 1)
@@ -58,7 +61,7 @@ namespace FishNet.Managing.Timing
             _sampleAccumulator += newSample;
             _samples[_writeIndex] = newSample;
 
-            //Increase writeIndex.
+            // Increase writeIndex.
             _writeIndex++;
             _writtenSamples = Math.Max(_writtenSamples, _writeIndex);
             if (_writeIndex >= _samples.Length)
@@ -67,15 +70,27 @@ namespace FishNet.Managing.Timing
             Average = _sampleAccumulator / _writtenSamples;
 
             /* If samples are full then drop off
-            * the oldest sample. This will always be
-            * the one just after written. The entry isn't
-            * actually removed from the array but will
-            * be overwritten next sample. */
+             * the oldest sample. This will always be
+             * the one just after written. The entry isn't
+             * actually removed from the array but will
+             * be overwritten next sample. */
             if (_writtenSamples >= _samples.Length)
                 _sampleAccumulator -= _samples[_writeIndex];
+        }
 
+        /// <summary>
+        /// Resets values.
+        /// </summary>
+        public void Reset()
+        {
+            _sampleAccumulator = 0f;
+            _writeIndex = 0;
+            _writtenSamples = 0;
+        }
+
+        public void Dispose()
+        {
+            Reset();
         }
     }
-
-
 }

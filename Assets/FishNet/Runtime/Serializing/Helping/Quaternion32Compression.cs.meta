@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: a4817c0ff1d35431781892d0f2ef496b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 207815
+  packageName: 'FishNet: Networking Evolved'
+  packageVersion: 4.7.2R
+  assetPath: Assets/FishNet/Runtime/Serializing/Helping/Quaternion32Compression.cs
+  uploadId: 901598

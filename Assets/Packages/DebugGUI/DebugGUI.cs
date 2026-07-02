@@ -15,7 +15,7 @@ public class DebugGUI : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = FindObjectOfType<DebugGUI>();
+                _instance = FindAnyObjectByType<DebugGUI>();
 
                 if (_instance == null && Application.isPlaying)
                 {
@@ -541,7 +541,7 @@ public class DebugGUI : MonoBehaviour
     // Populate attributes
     void RegisterAttributes()
     {
-        MonoBehaviour[] sceneObjects = FindObjectsOfType<MonoBehaviour>();
+        MonoBehaviour[] sceneObjects = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
         HashSet<MonoBehaviour> uniqueAttributeContainers = new HashSet<MonoBehaviour>();
 
         foreach (MonoBehaviour mb in sceneObjects)

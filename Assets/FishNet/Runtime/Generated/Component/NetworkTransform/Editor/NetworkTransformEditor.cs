@@ -1,18 +1,20 @@
 ﻿#if UNITY_EDITOR
 using FishNet.Editing;
+using GameKit.Dependencies.Utilities;
 using UnityEditor;
 using UnityEngine;
+using LayoutTools = GameKit.Dependencies.Utilities.EditorGuiLayoutTools;
 
 namespace FishNet.Component.Transforming.Editing
 {
-
-
     [CustomEditor(typeof(NetworkTransform), true)]
     [CanEditMultipleObjects]
     public class NetworkTransformEditor : Editor
     {
-        private SerializedProperty _packing;
+        private SerializedProperty _componentConfiguration;
         private SerializedProperty _synchronizeParent;
+        private SerializedProperty _packing;
+        private SerializedProperty _useScaledTime;
         private SerializedProperty _interpolation;
         private SerializedProperty _extrapolation;
         private SerializedProperty _enableTeleport;
@@ -21,49 +23,54 @@ namespace FishNet.Component.Transforming.Editing
         private SerializedProperty _sendToOwner;
         private SerializedProperty _interval;
         private SerializedProperty _synchronizePosition;
+        private SerializedProperty _positionSensitivity;
         private SerializedProperty _positionSnapping;
         private SerializedProperty _synchronizeRotation;
         private SerializedProperty _rotationSnapping;
         private SerializedProperty _synchronizeScale;
+        private SerializedProperty _scaleSensitivity;
         private SerializedProperty _scaleSnapping;
-
 
         protected virtual void OnEnable()
         {
-            _packing = serializedObject.FindProperty("_packing");
-            _synchronizeParent = serializedObject.FindProperty("_synchronizeParent");
-            _interpolation = serializedObject.FindProperty("_interpolation");
-            _extrapolation = serializedObject.FindProperty("_extrapolation");
-            _enableTeleport = serializedObject.FindProperty("_enableTeleport");
-            _teleportThreshold = serializedObject.FindProperty("_teleportThreshold");
-            _clientAuthoritative = serializedObject.FindProperty("_clientAuthoritative");
-            _sendToOwner = serializedObject.FindProperty("_sendToOwner");
-            _interval = serializedObject.FindProperty("_interval");
-            _synchronizePosition = serializedObject.FindProperty("_synchronizePosition");
-            _positionSnapping = serializedObject.FindProperty("_positionSnapping");
-            _synchronizeRotation = serializedObject.FindProperty("_synchronizeRotation");
-            _rotationSnapping = serializedObject.FindProperty("_rotationSnapping");
-            _synchronizeScale = serializedObject.FindProperty("_synchronizeScale");
-            _scaleSnapping = serializedObject.FindProperty("_scaleSnapping");
+            _componentConfiguration = serializedObject.FindProperty(nameof(_componentConfiguration));
+            _synchronizeParent = serializedObject.FindProperty(nameof(_synchronizeParent));
+            _packing = serializedObject.FindProperty(nameof(_packing));
+            _useScaledTime = serializedObject.FindProperty(nameof(_useScaledTime));
+            _interpolation = serializedObject.FindProperty(nameof(_interpolation));
+            _extrapolation = serializedObject.FindProperty(nameof(_extrapolation));
+            _enableTeleport = serializedObject.FindProperty(nameof(_enableTeleport));
+            _teleportThreshold = serializedObject.FindProperty(nameof(_teleportThreshold));
+            _clientAuthoritative = serializedObject.FindProperty(nameof(_clientAuthoritative));
+            _sendToOwner = serializedObject.FindProperty(nameof(_sendToOwner));
+            _interval = serializedObject.FindProperty(nameof(_interval));
+            _synchronizePosition = serializedObject.FindProperty(nameof(_synchronizePosition));
+            _positionSensitivity = serializedObject.FindProperty(nameof(_positionSensitivity));
+            _positionSnapping = serializedObject.FindProperty(nameof(_positionSnapping));
+            _synchronizeRotation = serializedObject.FindProperty(nameof(_synchronizeRotation));
+            _rotationSnapping = serializedObject.FindProperty(nameof(_rotationSnapping));
+            _synchronizeScale = serializedObject.FindProperty(nameof(_synchronizeScale));
+            _scaleSensitivity = serializedObject.FindProperty(nameof(_scaleSensitivity));
+            _scaleSnapping = serializedObject.FindProperty(nameof(_scaleSnapping));
         }
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
 
-            GUI.enabled = false;
-            EditorGUILayout.ObjectField("Script:", MonoScript.FromMonoBehaviour((NetworkTransform)target), typeof(NetworkTransform), false);
-            GUI.enabled = true;
+            LayoutTools.AddObjectField("Script:", MonoScript.FromMonoBehaviour((NetworkTransform)target), typeof(NetworkTransform), false, EditorLayoutEnableType.Disabled);
 
-            
-#pragma warning disable CS0162 // Unreachable code detected
+            bool isPro = false;
+            if (isPro)
+                EditorGUILayout.HelpBox(EditingConstants.PRO_ASSETS_UNLOCKED_TEXT, MessageType.None);
+            else
                 EditorGUILayout.HelpBox(EditingConstants.PRO_ASSETS_LOCKED_TEXT, MessageType.Warning);
-#pragma warning restore CS0162 // Unreachable code detected
 
             //Misc.
             EditorGUILayout.LabelField("Misc", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
-            EditorGUILayout.PropertyField(_synchronizeParent, new GUIContent("* Synchronize Parent"));
+            EditorGUILayout.PropertyField(_componentConfiguration);
+            EditorGUILayout.PropertyField(_synchronizeParent, new GUIContent("Synchronize Parent"));
             EditorGUILayout.PropertyField(_packing);
             EditorGUI.indentLevel--;
             EditorGUILayout.Space();
@@ -71,6 +78,7 @@ namespace FishNet.Component.Transforming.Editing
             //Smoothing.
             EditorGUILayout.LabelField("Smoothing", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_useScaledTime);
             EditorGUILayout.PropertyField(_interpolation);
             EditorGUILayout.PropertyField(_extrapolation, new GUIContent("* Extrapolation"));
             EditorGUILayout.PropertyField(_enableTeleport);
@@ -80,6 +88,7 @@ namespace FishNet.Component.Transforming.Editing
                 EditorGUILayout.PropertyField(_teleportThreshold);
                 EditorGUI.indentLevel--;
             }
+
             EditorGUI.indentLevel--;
             EditorGUILayout.Space();
 
@@ -93,6 +102,7 @@ namespace FishNet.Component.Transforming.Editing
                 EditorGUILayout.PropertyField(_sendToOwner);
                 EditorGUI.indentLevel--;
             }
+
             EditorGUI.indentLevel--;
             EditorGUILayout.Space();
 
@@ -100,15 +110,17 @@ namespace FishNet.Component.Transforming.Editing
             EditorGUILayout.LabelField("Synchronizing.", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             //Interval.
-            EditorGUILayout.PropertyField(_interval, new GUIContent("Interval", "How often in ticks to synchronize. A value of 1 will synchronize every tick, a value of 10 will synchronize every 10 ticks."));
+            EditorGUILayout.PropertyField(_interval, new GUIContent("Send Interval"));
             //Position.
             EditorGUILayout.PropertyField(_synchronizePosition);
             if (_synchronizePosition.boolValue)
             {
                 EditorGUI.indentLevel += 2;
                 EditorGUILayout.PropertyField(_positionSnapping);
+                EditorGUILayout.PropertyField(_positionSensitivity);
                 EditorGUI.indentLevel -= 2;
             }
+
             //Rotation.
             EditorGUILayout.PropertyField(_synchronizeRotation);
             if (_synchronizeRotation.boolValue)
@@ -117,19 +129,21 @@ namespace FishNet.Component.Transforming.Editing
                 EditorGUILayout.PropertyField(_rotationSnapping);
                 EditorGUI.indentLevel -= 2;
             }
+
             //Scale.
             EditorGUILayout.PropertyField(_synchronizeScale);
             if (_synchronizeScale.boolValue)
             {
                 EditorGUI.indentLevel += 2;
                 EditorGUILayout.PropertyField(_scaleSnapping);
+                EditorGUILayout.PropertyField(_scaleSensitivity);
                 EditorGUI.indentLevel -= 2;
             }
+
             EditorGUI.indentLevel--;
 
             serializedObject.ApplyModifiedProperties();
         }
     }
-
 }
 #endif

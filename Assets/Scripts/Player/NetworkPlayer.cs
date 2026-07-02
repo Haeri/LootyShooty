@@ -6,8 +6,8 @@ public class NetworkPlayer : NetworkBehaviour
 {
     public static NetworkPlayer Instance { get; private set; }
 
-    [SyncVar] public string playerName;
-    [SyncVar] public int ping;
+    public readonly SyncVar<string> playerName = new(string.Empty);
+    public readonly SyncVar<int> ping = new(0);
 
     [SerializeField] public GameObject pawnPrefab;
     

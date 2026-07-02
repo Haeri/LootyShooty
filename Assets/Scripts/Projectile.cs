@@ -33,7 +33,7 @@ public class Projectile : MonoBehaviour
             if (!blank && !dmg.IsDead())
             {
                 damage = (int)(damage * multiplier);
-                Debug.Log($"Player({shooter.GetComponent<NetworkPlayer>().playerName}) shot {dmg.name}. {dmg.health}hp -> {dmg.health - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
+                Debug.Log($"Player({shooter.GetComponent<NetworkPlayer>().playerName.Value}) shot {dmg.name}. {dmg.health.Value}hp -> {dmg.health.Value - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
                 bool died = dmg.TakeDamage(damage);
                 //shooter?.GetComponent<PlayerController>()?.enemyHitCallback(dmg.gameObject, damage, died);                
             }
@@ -57,7 +57,7 @@ public class Projectile : MonoBehaviour
         {
             //Debug.Log("Penetrate");
             Physics.IgnoreCollision(GetComponent<Collider>(), collision.collider);
-            rb.velocity = rb.velocity * 0.8f;
+            rb.linearVelocity = rb.linearVelocity * 0.8f;
             penetrationCount++;
         }
         // Deflect
@@ -65,11 +65,11 @@ public class Projectile : MonoBehaviour
         {
             //Debug.Log("Deflect");
             float strength = lastVelocity.magnitude;
-            rb.velocity = Vector3.Reflect(-vel, norm) * strength;
+            rb.linearVelocity = Vector3.Reflect(-vel, norm) * strength;
 
             Debug.DrawRay(collision.contacts[0].point, norm*0.5f, Color.cyan, 10);
             Debug.DrawRay(collision.contacts[0].point, vel * 0.5f, Color.green, 10);
-            Debug.DrawRay(collision.contacts[0].point, rb.velocity.normalized * 0.5f, Color.red, 10);
+            Debug.DrawRay(collision.contacts[0].point, rb.linearVelocity.normalized * 0.5f, Color.red, 10);
         }
         // Absorb
         else
@@ -92,6 +92,6 @@ public class Projectile : MonoBehaviour
 
     void FixedUpdate()
     {
-        lastVelocity = rb.velocity;
+        lastVelocity = rb.linearVelocity;
     }
 }

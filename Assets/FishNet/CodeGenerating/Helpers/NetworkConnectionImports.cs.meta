@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3ff7f79d2da1348bcaf9a314b18c1ef5
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 207815
+  packageName: 'FishNet: Networking Evolved'
+  packageVersion: 4.7.2R
+  assetPath: Assets/FishNet/CodeGenerating/Helpers/NetworkConnectionImports.cs
+  uploadId: 901598

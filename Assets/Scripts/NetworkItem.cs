@@ -12,6 +12,6 @@ public class NetworkItem : NetworkBehaviour
     {
         base.OnStartNetwork();
 
-        GetComponent<Rigidbody>().isKinematic = !IsServer;       
+        GetComponent<Rigidbody>().isKinematic = !IsServerInitialized;
     }
 }

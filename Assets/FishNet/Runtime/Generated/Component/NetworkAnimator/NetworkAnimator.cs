@@ -1,3 +1,6 @@
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#define DEVELOPMENT
+#endif
 using FishNet.Component.Transforming;
 using FishNet.Connection;
 using FishNet.Documenting;
@@ -7,11 +10,14 @@ using FishNet.Object;
 using FishNet.Serializing;
 using FishNet.Utility;
 using FishNet.Utility.Performance;
+using GameKit.Dependencies.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using FishNet.Managing;
+using Unity.Profiling;
 using UnityEngine;
-
+using TimeManagerCls = FishNet.Managing.Timing.TimeManager;
 
 namespace FishNet.Component.Animating
 {
@@ -27,7 +33,8 @@ namespace FishNet.Component.Animating
             /// <summary>
             /// Gets an Arraysegment of received data.
             /// </summary>
-            public ArraySegment<byte> GetArraySegment() => new ArraySegment<byte>(_data, 0, _length);
+            public ArraySegment<byte> GetArraySegment() => new(_data, 0, _length);
+
             /// <summary>
             /// How much data written.
             /// </summary>
@@ -50,15 +57,20 @@ namespace FishNet.Component.Animating
                     ByteArrayPool.Store(_data);
             }
         }
+
         private struct StateChange
         {
+            /// <summary>
+            /// Frame which the state was changed.
+            /// </summary>
+            public int FrameCount;
             /// <summary>
             /// True if a crossfade.
             /// </summary>
             public bool IsCrossfade;
             /// <summary>
             /// Hash to crossfade into.
-            /// </summary>  
+            /// </summary>
             public int Hash;
             /// <summary>
             /// True if using FixedTime.
@@ -77,8 +89,20 @@ namespace FishNet.Component.Animating
             /// </summary>
             public float NormalizedTransitionTime;
 
-            public StateChange(int hash, bool fixedTime, float duration, float offset, float normalizedTransition)
+            public StateChange(int frame)
             {
+                FrameCount = frame;
+                IsCrossfade = default;
+                Hash = default;
+                FixedTime = default;
+                DurationTime = default;
+                OffsetTime = default;
+                NormalizedTransitionTime = default;
+            }
+
+            public StateChange(int frame, int hash, bool fixedTime, float duration, float offset, float normalizedTransition)
+            {
+                FrameCount = frame;
                 IsCrossfade = true;
                 Hash = hash;
                 FixedTime = fixedTime;
@@ -87,17 +111,17 @@ namespace FishNet.Component.Animating
                 NormalizedTransitionTime = normalizedTransition;
             }
         }
+
         /// <summary>
         /// Animator updates received from clients when using Client Authoritative.
         /// </summary>
         private class ClientAuthoritativeUpdate
         {
             /// <summary>
-            /// 
             /// </summary>
             public ClientAuthoritativeUpdate()
             {
-                //Start buffers off at 8 bytes nad grow them as needed.
+                // Start buffers off at 8 bytes nad grow them as needed.
                 for (int i = 0; i < MAXIMUM_BUFFER_COUNT; i++)
                     _buffers.Add(new byte[MAXIMUM_DATA_SIZE]);
 
@@ -123,7 +147,7 @@ namespace FishNet.Component.Animating
             /// <summary>
             /// Buffers.
             /// </summary>
-            private List<byte[]> _buffers = new List<byte[]>();
+            private List<byte[]> _buffers = new();
             #endregion
 
             #region Const.
@@ -146,7 +170,7 @@ namespace FishNet.Component.Animating
                 if (dataCount > MAXIMUM_DATA_SIZE)
                     return;
 
-                //If index exceeds buffer count.
+                // If index exceeds buffer count.
                 if (BufferCount >= MAXIMUM_BUFFER_COUNT)
                 {
                     ForceAll = true;
@@ -163,25 +187,26 @@ namespace FishNet.Component.Animating
             /// <summary>
             /// Sets referenced data to buffer and it's length for index.
             /// </summary>
-            /// <param name="index"></param>
-            /// <param name="buffer"></param>
-            /// <param name="length"></param>
+            /// <param name = "index"></param>
+            /// <param name = "buffer"></param>
+            /// <param name = "length"></param>
             public void GetBuffer(int index, ref byte[] buffer, ref int length)
             {
                 if (index > _buffers.Count)
                 {
-                    Debug.LogWarning("Index exceeds Buffers count.");
+                    NetworkManagerExtensions.LogWarning("Index exceeds Buffers count.");
                     return;
                 }
                 if (index > _bufferLengths.Length)
                 {
-                    Debug.LogWarning("Index exceeds BufferLengths count.");
+                    NetworkManagerExtensions.LogWarning("Index exceeds BufferLengths count.");
                     return;
                 }
 
                 buffer = _buffers[index];
                 length = _bufferLengths[index];
             }
+
             /// <summary>
             /// Resets buffers.
             /// </summary>
@@ -190,8 +215,8 @@ namespace FishNet.Component.Animating
                 BufferCount = 0;
                 ForceAll = false;
             }
-
         }
+
         /// <summary>
         /// Information on how to smooth to a float value.
         /// </summary>
@@ -221,6 +246,7 @@ namespace FishNet.Component.Animating
                 Setting = setting;
             }
         }
+
         /// <summary>
         /// Details about an animator parameter.
         /// </summary>
@@ -252,8 +278,9 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Parameters which will not be synchronized.
         /// </summary>
-        [SerializeField, HideInInspector]
-        internal List<string> IgnoredParameters = new List<string>();
+        [SerializeField]
+        [HideInInspector]
+        internal List<string> IgnoredParameters = new();
         #endregion
 
         #region Serialized.
@@ -266,7 +293,16 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// The animator component to synchronize.
         /// </summary>
-        public Animator Animator { get { return _animator; } }
+        public Animator Animator
+        {
+            get { return _animator; }
+        }
+        /// <summary>
+        /// True to synchronize changes even when the animator component is disabled.
+        /// </summary>
+        [Tooltip("True to synchronize changes even when the animator component is disabled.")]
+        [SerializeField]
+        private bool _synchronizeWhenDisabled;
         /// <summary>
         /// True to smooth float value changes for spectators.
         /// </summary>
@@ -280,15 +316,7 @@ namespace FishNet.Component.Animating
         [Range(1, NetworkTransform.MAX_INTERPOLATION)]
         [SerializeField]
         private ushort _interpolation = 2;
-        ///// <summary>
-        ///// How often to synchronize this animator.
-        ///// </summary>
-        //[Tooltip("How often to synchronize this animator.")]
-        //[Range(0.01f, 0.5f)]
-        //[SerializeField]
-        //private float _synchronizeInterval = 0.1f;
         /// <summary>
-        /// 
         /// </summary>
         [Tooltip("True if using client authoritative animations.")]
         [SerializeField]
@@ -296,7 +324,10 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// True if using client authoritative animations.
         /// </summary>
-        public bool ClientAuthoritative { get { return _clientAuthoritative; } }
+        public bool ClientAuthoritative
+        {
+            get { return _clientAuthoritative; }
+        }
         /// <summary>
         /// True to synchronize server results back to owner. Typically used when you are changing animations on the server and are relying on the server response to update the clients animations.
         /// </summary>
@@ -309,19 +340,19 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// All parameter values, excluding triggers.
         /// </summary>
-        private List<ParameterDetail> _parameterDetails = new List<ParameterDetail>();
+        private readonly List<ParameterDetail> _parameterDetails = new();
         /// <summary>
         /// Last int values.
         /// </summary>
-        private List<int> _ints = new List<int>();
+        private readonly List<int> _ints = new();
         /// <summary>
         /// Last float values.
         /// </summary>
-        private List<float> _floats = new List<float>();
+        private readonly List<float> _floats = new();
         /// <summary>
         /// Last bool values.
         /// </summary>
-        private List<bool> _bools = new List<bool>();
+        private readonly List<bool> _bools = new();
         /// <summary>
         /// Last layer weights.
         /// </summary>
@@ -330,37 +361,45 @@ namespace FishNet.Component.Animating
         /// Last speed.
         /// </summary>
         private float _speed;
-        ///// <summary>
-        ///// Next time client may send parameter updates.
-        ///// </summary>
-        //private float _nextClientSendTime = -1f;
-        ///// <summary>
-        ///// Next time server may send parameter updates.
-        ///// </summary>
-        //private float _nextServerSendTime = -1f;
         /// <summary>
         /// Trigger values set by using SetTrigger and ResetTrigger.
         /// </summary>
-        private List<TriggerUpdate> _triggerUpdates = new List<TriggerUpdate>();
+        private readonly List<TriggerUpdate> _triggerUpdates = new();
+        // /// <summary>
+        // /// Updates going to clients.
+        // /// </summary>
+        // private List<byte[]> _toClientsBuffer = new();
         /// <summary>
-        /// Updates going to clients.
+        /// Returns if the animator is exist and can be synchronized.
         /// </summary>
-        private List<byte[]> _toClientsBuffer = new List<byte[]>();
-        /// <summary>
-        /// Returns if the animator is exist and is active.
-        /// </summary>
-        private bool _isAnimatorEnabled
+        private bool _canSynchronizeAnimator
         {
             get
             {
-                bool failedChecks = (_animator == null || !_animator.enabled || _animator.runtimeAnimatorController == null);
+                if (!_isAnimatorSet)
+                    return false;
+
+                if (_animator.enabled || _synchronizeWhenDisabled)
+                    return true;
+
+                return false;
+            }
+        }
+        /// <summary>
+        /// True if the animator is valid but not enabled.
+        /// </summary>
+        private bool _isAnimatorSet
+        {
+            get
+            {
+                bool failedChecks = _animator == null || _animator.runtimeAnimatorController == null;
                 return !failedChecks;
             }
         }
         /// <summary>
         /// Float valeus to smooth towards.
         /// </summary>
-        private Dictionary<int, SmoothedFloat> _smoothedFloats = new Dictionary<int, SmoothedFloat>();
+        private Dictionary<int, SmoothedFloat> _smoothedFloats = new();
         /// <summary>
         /// Returns if floats can be smoothed for this client.
         /// </summary>
@@ -368,14 +407,14 @@ namespace FishNet.Component.Animating
         {
             get
             {
-                //Don't smooth on server only.
-                if (!base.IsClient)
+                // Don't smooth on server only.
+                if (!IsClientStarted)
                     return false;
-                //Smoothing is disabled.
+                // Smoothing is disabled.
                 if (!_smoothFloats)
                     return false;
-                //No reason to smooth for self.
-                if (base.IsOwner && ClientAuthoritative)
+                // No reason to smooth for self.
+                if (IsOwner && ClientAuthoritative)
                     return false;
 
                 //Fall through.
@@ -385,11 +424,7 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Layers which need to have their state synchronized. Key is the layer, Value is the state change information.
         /// </summary>
-        private Dictionary<int, StateChange> _unsynchronizedLayerStates = new Dictionary<int, StateChange>();
-        /// <summary>
-        /// Layers which need to have their state blend synchronized. Key is ParameterIndex, Value is next state hash.
-        /// </summary>
-        //private Dictionary<int, int> _unsynchronizedLayerStates = new HashSet<int>();
+        private Dictionary<int, StateChange> _unsynchronizedLayerStates = new();
         /// <summary>
         /// Last animator set.
         /// </summary>
@@ -401,7 +436,7 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// PooledWriter for this animator.
         /// </summary>
-        private PooledWriter _writer = new PooledWriter();
+        private PooledWriter _writer = new();
         /// <summary>
         /// Holds client authoritative updates received to send to other clients.
         /// </summary>
@@ -413,11 +448,26 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Animations received which should be applied.
         /// </summary>
-        private Queue<ReceivedServerData> _fromServerBuffer = new Queue<ReceivedServerData>();
+        private Queue<ReceivedServerData> _fromServerBuffer = new();
         /// <summary>
         /// Tick when the buffer may begin to run.
         /// </summary>
-        private uint _startTick = uint.MaxValue;
+        private uint _startTick = TimeManagerCls.UNSET_TICK;
+        /// <summary>
+        /// True if subscribed to TimeManager for ticks.
+        /// </summary>
+        private bool _subscribedToTicks;
+        #endregion
+
+        #region Private Profiler Markers
+        private static readonly ProfilerMarker _pm_OnPreTick = new("NetworkAnimator.TimeManager_OnPreTick()");
+        private static readonly ProfilerMarker _pm_OnPostTick = new("NetworkAnimator.TimeManager_OnPostTick()");
+        private static readonly ProfilerMarker _pm_OnUpdate = new("NetworkAnimator.TimeManager_OnUpdate()");
+        private static readonly ProfilerMarker _pm_CheckSendToServer = new("NetworkAnimator.CheckSendToServer()");
+        private static readonly ProfilerMarker _pm_CheckSendToClients = new("NetworkAnimator.CheckSendToClients()");
+        private static readonly ProfilerMarker _pm_SmoothFloats = new("NetworkAnimator.SmoothFloats()");
+        private static readonly ProfilerMarker _pm_AnimatorUpdated = new("NetworkAnimator.AnimatorUpdated(ref ArraySegment<byte>, bool)");
+        private static readonly ProfilerMarker _pm_ApplyParametersUpdated = new("NetworkAnimator.ApplyParametersUpdated(ref ArraySegment<byte>)");
         #endregion
 
         #region Const.
@@ -448,11 +498,15 @@ namespace FishNet.Component.Animating
             InitializeOnce();
         }
 
+        private void OnDestroy()
+        {
+            ChangeTickSubscription(false);
+        }
+
         [APIExclude]
         public override void OnSpawnServer(NetworkConnection connection)
         {
-            base.OnSpawnServer(connection);
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
             if (AnimatorUpdated(out ArraySegment<byte> updatedBytes, true))
                 TargetAnimatorUpdated(connection, updatedBytes);
@@ -460,92 +514,124 @@ namespace FishNet.Component.Animating
 
         public override void OnStartNetwork()
         {
-            base.OnStartNetwork();
-            base.TimeManager.OnPreTick += TimeManager_OnPreTick;
-            base.TimeManager.OnPostTick += TimeManager_OnPostTick;
+            ChangeTickSubscription(true);
         }
 
         [APIExclude]
         public override void OnStartServer()
         {
-            base.OnStartServer();
             //If using client authoritative then initialize clientAuthoritativeUpdates.
             if (_clientAuthoritative)
             {
-                _clientAuthoritativeUpdates = new ClientAuthoritativeUpdate();
-                //Expand to clients buffer count to however many buffers can be held.
-                for (int i = 0; i < ClientAuthoritativeUpdate.MAXIMUM_BUFFER_COUNT; i++)
-                    _toClientsBuffer.Add(new byte[0]);
+                _clientAuthoritativeUpdates = new();
+                // //Expand to clients buffer count to however many buffers can be held.
+                // for (int i = 0; i < ClientAuthoritativeUpdate.MAXIMUM_BUFFER_COUNT; i++)
+                //     _toClientsBuffer.Add(new byte[0]);
             }
-            else
-            {
-                _toClientsBuffer.Add(new byte[0]);
-            }
+            // else
+            // {
+            //     _toClientsBuffer.Add(new byte[0]);
+            // }
+        }
+
+        public override void OnStartClient()
+        {
+            TimeManager.OnUpdate += TimeManager_OnUpdate;
+        }
+
+        public override void OnStopClient()
+        {
+            if (TimeManager != null)
+                TimeManager.OnUpdate -= TimeManager_OnUpdate;
         }
 
         public override void OnStopNetwork()
         {
-            base.OnStopNetwork();
-            base.TimeManager.OnPreTick -= TimeManager_OnPreTick;
-            base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
+            _unsynchronizedLayerStates.Clear();
+            ChangeTickSubscription(false);
         }
 
+        /// <summary>
+        /// Tries to subscribe to TimeManager ticks.
+        /// </summary>
+        private void ChangeTickSubscription(bool subscribe)
+        {
+            if (subscribe == _subscribedToTicks || NetworkManager == null)
+                return;
+
+            _subscribedToTicks = subscribe;
+            if (subscribe)
+            {
+                NetworkManager.TimeManager.OnPreTick += TimeManager_OnPreTick;
+                NetworkManager.TimeManager.OnPostTick += TimeManager_OnPostTick;
+            }
+            else
+            {
+                NetworkManager.TimeManager.OnPreTick -= TimeManager_OnPreTick;
+                NetworkManager.TimeManager.OnPostTick -= TimeManager_OnPostTick;
+            }
+        }
 
         /// <summary>
         /// Called right before a tick occurs, as well before data is read.
         /// </summary>
         private void TimeManager_OnPreTick()
         {
-            if (!_isAnimatorEnabled)
+            using (_pm_OnPreTick.Auto())
             {
-                _fromServerBuffer.Clear();
-                return;
-            }
-            //Disabled/cannot start.
-            if (_startTick == uint.MaxValue)
-                return;
-            //Nothing in queue.
-            if (_fromServerBuffer.Count == 0)
-            {
-                _startTick = uint.MaxValue;
-                return;
-            }
-            //Not enough time has passed to start queue.
-            if (base.TimeManager.LocalTick < _startTick)
-                return;
+                if (!_canSynchronizeAnimator)
+                {
+                    _fromServerBuffer.Clear();
+                    return;
+                }
+                //Disabled/cannot start.
+                if (_startTick == 0)
+                    return;
+                //Nothing in queue.
+                if (_fromServerBuffer.Count == 0)
+                {
+                    _startTick = 0;
+                    return;
+                }
+                //Not enough time has passed to start queue.
+                if (TimeManager.LocalTick < _startTick)
+                    return;
 
-            ReceivedServerData rd = _fromServerBuffer.Dequeue();
-            ArraySegment<byte> segment = rd.GetArraySegment();
-            ApplyParametersUpdated(ref segment);
-            rd.Dispose();
+                ReceivedServerData rd = _fromServerBuffer.Dequeue();
+                ArraySegment<byte> segment = rd.GetArraySegment();
+                ApplyParametersUpdated(ref segment);
+                rd.Dispose();
+            }
         }
-
 
         /* Use post tick values are checked after
          * client has an opportunity to use OnTick. */
         /// <summary>
         /// Called after a tick occurs; physics would have simulated if using PhysicsMode.TimeManager.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void TimeManager_OnPostTick()
         {
-            //One check rather than per each method.
-            if (!_isAnimatorEnabled)
-                return;
+            using (_pm_OnPostTick.Auto())
+            {
+                //One check rather than per each method.
+                if (!_canSynchronizeAnimator)
+                    return;
 
-            if (base.IsClient)
                 CheckSendToServer();
-            if (base.IsServer)
                 CheckSendToClients();
+            }
         }
 
-        private void Update()
+        private void TimeManager_OnUpdate()
         {
-            if (!_isAnimatorEnabled)
-                return;
+            using (_pm_OnUpdate.Auto())
+            {
+                if (!_canSynchronizeAnimator)
+                    return;
 
-            if (base.IsClient)
-                SmoothFloats();
+                if (IsClientStarted)
+                    SmoothFloats();
+            }
         }
 
         /// <summary>
@@ -560,7 +646,7 @@ namespace FishNet.Component.Animating
             if (!ApplicationState.IsPlaying())
                 return;
 
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
             {
                 //Debug.LogWarning("Animator is null or not enabled; unable to initialize for animator. Use SetAnimator if animator was changed or enable the animator.");
                 return;
@@ -582,13 +668,12 @@ namespace FishNet.Component.Animating
             foreach (AnimatorControllerParameter item in _animator.parameters)
             {
                 bool process = !_animator.IsParameterControlledByCurve(item.name);
-                
                 if (process)
                 {
                     //Over 250 parameters; who would do this!?
                     if (_parameterDetails.Count == 240)
                     {
-                        Debug.LogError($"Parameter {item.name} exceeds the allowed 240 parameter count and is being ignored.");
+                        NetworkManager.LogError($"Parameter {item.name} exceeds the allowed 240 parameter count and is being ignored.");
                         continue;
                     }
 
@@ -619,7 +704,7 @@ namespace FishNet.Component.Animating
                         typeIndex = -1;
                     }
 
-                    _parameterDetails.Add(new ParameterDetail(item, (byte)typeIndex));
+                    _parameterDetails.Add(new(item, (byte)typeIndex));
                 }
             }
         }
@@ -627,7 +712,7 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Sets which animator to use. You must call this with the appropriate animator on all clients and server. This change is not automatically synchronized.
         /// </summary>
-        /// <param name="animator"></param>
+        /// <param name = "animator"></param>
         public void SetAnimator(Animator animator)
         {
             //No update required.
@@ -642,7 +727,7 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Sets which controller to use. You must call this with the appropriate controller on all clients and server. This change is not automatically synchronized.
         /// </summary>
-        /// <param name="controller"></param>        
+        /// <param name = "controller"></param>
         public void SetController(RuntimeAnimatorController controller)
         {
             //No update required.
@@ -659,26 +744,25 @@ namespace FishNet.Component.Animating
         /// </summary>
         private void CheckSendToServer()
         {
-            //Cannot send to server if is server or not client.
-            if (base.IsServer || !base.IsClient)
-                return;
-            //Cannot send to server if not client authoritative or don't have authority.
-            if (!ClientAuthoritative || !base.IsOwner)
-                return;
-            ////Not enough time passed to send.
-            //if (Time.time < _nextClientSendTime)
-            //    return;
-            //_nextClientSendTime = Time.time + _synchronizeInterval;
+            using (_pm_CheckSendToServer.Auto())
+            {
+                //Cannot send to server if is server or not client.
+                if (IsServerStarted || !IsClientInitialized)
+                    return;
+                //Cannot send to server if not client authoritative or don't have authority.
+                if (!ClientAuthoritative || !IsOwner)
+                    return;
 
-            /* If there are updated parameters to send.
-             * Don't really need to worry about mtu here
-             * because there's no way the sent bytes are
-             * ever going to come close to the mtu
-             * when sending a single update. */
-            if (AnimatorUpdated(out ArraySegment<byte> updatedBytes, _forceAllOnTimed))
-                ServerAnimatorUpdated(updatedBytes);
+                /* If there are updated parameters to send.
+                 * Don't really need to worry about mtu here
+                 * because there's no way the sent bytes are
+                 * ever going to come close to the mtu
+                 * when sending a single update. */
+                if (AnimatorUpdated(out ArraySegment<byte> updatedBytes, _forceAllOnTimed))
+                    ServerAnimatorUpdated(updatedBytes);
 
-            _forceAllOnTimed = false;
+                _forceAllOnTimed = false;
+            }
         }
 
         /// <summary>
@@ -686,129 +770,142 @@ namespace FishNet.Component.Animating
         /// </summary>
         private void CheckSendToClients()
         {
-            //Cannot send to clients if not server.
-            if (!base.IsServer)
-                return;
-            ////Not enough time passed to send.
-            //if (Time.time < _nextServerSendTime)
-            //    return;
-            //_nextServerSendTime = Time.time + _synchronizeInterval;
-
-            bool sendFromServer;
-            //If client authoritative.
-            if (ClientAuthoritative)
+            using (_pm_CheckSendToClients.Auto())
             {
-                //If has no owner then use latest values on server.
-                if (!base.Owner.IsValid)
+                //Cannot send to clients if not server initialized.
+                if (!IsServerInitialized)
+                    return;
+
+                bool sendFromServer;
+                //If client authoritative.
+                if (ClientAuthoritative)
                 {
-                    sendFromServer = true;
-                }
-                //If has a owner.
-                else
-                {
-                    //If is owner then send latest values on server.
-                    if (base.IsOwner)
+                    //If has no owner then use latest values on server.
+                    if (!Owner.IsValid)
                     {
                         sendFromServer = true;
                     }
-                    //Not owner.
+                    //If has a owner.
                     else
                     {
-                        //Haven't received any data from clients, cannot send yet.
-                        if (_clientAuthoritativeUpdates.BufferCount == 0)
+                        //If is owner then send latest values on server.
+                        if (IsOwner)
                         {
-                            return;
+                            sendFromServer = true;
                         }
-                        //Data was received from client; check eligibility to send it.
+                        //Not owner.
                         else
                         {
-                            /* If forceAll is true then the latest values on
-                             * server must be used, rather than what was received
-                             * from client. This can occur if the client is possibly
-                             * trying to use an attack or if the client is
-                             * excessively sending updates. To prevent relaying that
-                             * same data to others the server will send it's current
-                             * animator settings in this scenario. */
-                            if (_clientAuthoritativeUpdates.ForceAll)
+                            //Haven't received any data from clients, cannot send yet.
+                            if (_clientAuthoritativeUpdates.BufferCount == 0)
                             {
-                                sendFromServer = true;
-                                _clientAuthoritativeUpdates.Reset();
+                                return;
                             }
+                            //Data was received from client; check eligibility to send it.
                             else
                             {
-                                sendFromServer = false;
+                                /* If forceAll is true then the latest values on
+                                 * server must be used, rather than what was received
+                                 * from client. This can occur if the client is possibly
+                                 * trying to use an attack or if the client is
+                                 * excessively sending updates. To prevent relaying that
+                                 * same data to others the server will send it's current
+                                 * animator settings in this scenario. */
+                                if (_clientAuthoritativeUpdates.ForceAll)
+                                {
+                                    sendFromServer = true;
+                                    _clientAuthoritativeUpdates.Reset();
+                                }
+                                else
+                                {
+                                    sendFromServer = false;
+                                }
                             }
                         }
                     }
                 }
-            }
-            //Not client authoritative, always send from server.
-            else
-            {
-                sendFromServer = true;
-            }
-
-            /* If client authoritative then use what was received from clients
-             * if data exist. */
-            if (!sendFromServer)
-            {
-                byte[] buffer = null;
-                int bufferLength = 0;
-                for (int i = 0; i < _clientAuthoritativeUpdates.BufferCount; i++)
+                //Not client authoritative, always send from server.
+                else
                 {
-                    _clientAuthoritativeUpdates.GetBuffer(i, ref buffer, ref bufferLength);
-
-                    //If null was returned then something went wrong.
-                    if (buffer == null || bufferLength == 0)
-                        continue;
-
-                    ObserversAnimatorUpdated(new ArraySegment<byte>(buffer, 0, bufferLength));
+                    sendFromServer = true;
                 }
-                //Reset client auth buffer.
-                _clientAuthoritativeUpdates.Reset();
-            }
-            //Sending from server, send what's changed.
-            else
-            {
-                if (AnimatorUpdated(out ArraySegment<byte> updatedBytes, _forceAllOnTimed))
-                    ObserversAnimatorUpdated(updatedBytes);
 
-                _forceAllOnTimed = false;
+                /* If client authoritative then use what was received from clients
+                 * if data exist. */
+                if (!sendFromServer)
+                {
+                    byte[] buffer = null;
+                    int bufferLength = 0;
+                    for (int i = 0; i < _clientAuthoritativeUpdates.BufferCount; i++)
+                    {
+                        _clientAuthoritativeUpdates.GetBuffer(i, ref buffer, ref bufferLength);
+
+                        //If null was returned then something went wrong.
+                        if (buffer == null || bufferLength == 0)
+                            continue;
+
+                        SendSegment(new(buffer, 0, bufferLength));
+                    }
+                    //Reset client auth buffer.
+                    _clientAuthoritativeUpdates.Reset();
+                }
+                //Sending from server, send what's changed.
+                else
+                {
+                    if (AnimatorUpdated(out ArraySegment<byte> updatedBytes, _forceAllOnTimed))
+                        SendSegment(updatedBytes);
+
+                    _forceAllOnTimed = false;
+                }
+
+                //Sends segment to clients
+                void SendSegment(ArraySegment<byte> data)
+                {
+                    foreach (NetworkConnection nc in Observers)
+                    {
+                        //If to not send to owner.
+                        if (!_sendToOwner && nc == Owner)
+                            continue;
+                        TargetAnimatorUpdated(nc, data);
+                    }
+                }
             }
         }
-
 
         /// <summary>
         /// Smooths floats on clients.
         /// </summary>
         private void SmoothFloats()
         {
-            //Don't need to smooth on authoritative client.
-            if (!_canSmoothFloats)
-                return;
-            //Nothing to smooth.
-            if (_smoothedFloats.Count == 0)
-                return;
-
-            float deltaTime = Time.deltaTime;
-
-            List<int> finishedEntries = new List<int>();
-
-            /* Cycle through each target float and move towards it.
-                * Once at a target float mark it to be removed from floatTargets. */
-            foreach (KeyValuePair<int, SmoothedFloat> item in _smoothedFloats)
+            using (_pm_SmoothFloats.Auto())
             {
-                float current = _animator.GetFloat(item.Key);
-                float next = Mathf.MoveTowards(current, item.Value.Target, item.Value.Rate * deltaTime);
-                _animator.SetFloat(item.Key, next);
+                //Don't need to smooth on authoritative client.
+                if (!_canSmoothFloats)
+                    return;
+                //Nothing to smooth.
+                if (_smoothedFloats.Count == 0)
+                    return;
 
-                if (next == item.Value.Target)
-                    finishedEntries.Add(item.Key);
+                float deltaTime = Time.deltaTime;
+
+                List<int> finishedEntries = new();
+
+                /* Cycle through each target float and move towards it.
+                 * Once at a target float mark it to be removed from floatTargets. */
+                foreach (KeyValuePair<int, SmoothedFloat> item in _smoothedFloats)
+                {
+                    float current = _animator.GetFloat(item.Key);
+                    float next = Mathf.MoveTowards(current, item.Value.Target, item.Value.Rate * deltaTime);
+                    _animator.SetFloat(item.Key, next);
+
+                    if (next == item.Value.Target)
+                        finishedEntries.Add(item.Key);
+                }
+
+                //Remove finished entries from dictionary.
+                for (int i = 0; i < finishedEntries.Count; i++)
+                    _smoothedFloats.Remove(finishedEntries[i]);
             }
-
-            //Remove finished entries from dictionary.
-            for (int i = 0; i < finishedEntries.Count; i++)
-                _smoothedFloats.Remove(finishedEntries[i]);
         }
 
         /// <summary>
@@ -817,141 +914,162 @@ namespace FishNet.Component.Animating
         /// <returns></returns>
         private bool AnimatorUpdated(out ArraySegment<byte> updatedBytes, bool forceAll = false)
         {
-            updatedBytes = default;
-            //Something isn't setup right.
-            if (_layerWeights == null)
-                return false;
-            //Reset the writer.
-            _writer.Reset();
-
-            /* Every time a parameter is updated a byte is added
-             * for it's index, this is why requiredBytes increases
-             * by 1 when a value updates. ChangedParameter contains
-             * the index updated and the new value. The requiresBytes
-             * is increased also by however many bytes are required
-             * for the type which has changed. Some types use special parameter
-             * detail indexes, such as layer weights; these can be found under const. */
-            for (byte parameterIndex = 0; parameterIndex < _parameterDetails.Count; parameterIndex++)
+            using (_pm_AnimatorUpdated.Auto())
             {
-                ParameterDetail pd = _parameterDetails[parameterIndex];
-                /* Bool. */
-                if (pd.ControllerParameter.type == AnimatorControllerParameterType.Bool)
+                updatedBytes = default;
+                //Something isn't setup right.
+                if (_layerWeights == null)
+                    return false;
+                //Reset the writer.
+                _writer.Clear();
+
+                /* Every time a parameter is updated a byte is added
+                 * for it's index, this is why requiredBytes increases
+                 * by 1 when a value updates. ChangedParameter contains
+                 * the index updated and the new value. The requiresBytes
+                 * is increased also by however many bytes are required
+                 * for the type which has changed. Some types use special parameter
+                 * detail indexes, such as layer weights; these can be found under const. */
+                for (byte parameterIndex = 0; parameterIndex < _parameterDetails.Count; parameterIndex++)
                 {
-                    bool next = _animator.GetBool(pd.Hash);
-                    //If changed.
-                    if (forceAll || _bools[pd.TypeIndex] != next)
+                    ParameterDetail pd = _parameterDetails[parameterIndex];
+                    /* Bool. */
+                    if (pd.ControllerParameter.type == AnimatorControllerParameterType.Bool)
                     {
-                        _writer.WriteByte(parameterIndex);
-                        _writer.WriteBoolean(next);
-                        _bools[pd.TypeIndex] = next;
+                        bool next = _animator.GetBool(pd.Hash);
+                        //If changed.
+                        if (forceAll || _bools[pd.TypeIndex] != next)
+                        {
+                            _writer.WriteUInt8Unpacked(parameterIndex);
+                            _writer.WriteBoolean(next);
+                            _bools[pd.TypeIndex] = next;
+                        }
+                    }
+                    /* Float. */
+                    else if (pd.ControllerParameter.type == AnimatorControllerParameterType.Float)
+                    {
+                        float next = _animator.GetFloat(pd.Hash);
+                        //If changed.
+                        if (forceAll || _floats[pd.TypeIndex] != next)
+                        {
+                            _writer.WriteUInt8Unpacked(parameterIndex);
+                            _writer.WriteSingle(next);
+                            _floats[pd.TypeIndex] = next;
+                        }
+                    }
+                    /* Int. */
+                    else if (pd.ControllerParameter.type == AnimatorControllerParameterType.Int)
+                    {
+                        int next = _animator.GetInteger(pd.Hash);
+                        //If changed.
+                        if (forceAll || _ints[pd.TypeIndex] != next)
+                        {
+                            _writer.WriteUInt8Unpacked(parameterIndex);
+                            _writer.WriteInt32(next);
+                            _ints[pd.TypeIndex] = next;
+                        }
                     }
                 }
-                /* Float. */
-                else if (pd.ControllerParameter.type == AnimatorControllerParameterType.Float)
+
+                /* Don't need to force trigger sends since
+                 * they're one-shots. */
+                for (int i = 0; i < _triggerUpdates.Count; i++)
                 {
-                    float next = _animator.GetFloat(pd.Hash);
-                    //If changed.
-                    if (forceAll || _floats[pd.TypeIndex] != next)
+                    _writer.WriteUInt8Unpacked(_triggerUpdates[i].ParameterIndex);
+                    _writer.WriteBoolean(_triggerUpdates[i].Setting);
+                }
+                _triggerUpdates.Clear();
+
+                /* States. */
+                if (forceAll)
+                {
+                    //Add all layers to layer states.
+                    for (int i = 0; i < _animator.layerCount; i++)
+                        _unsynchronizedLayerStates[i] = new(Time.frameCount);
+                }
+
+                /* Only iterate if the collection has values. This is to avoid some
+                 * unnecessary caching when collection is empty. */
+                if (_unsynchronizedLayerStates.Count > 0)
+                {
+                    int frameCount = Time.frameCount;
+                    List<int> sentLayers = CollectionCaches<int>.RetrieveList();
+                    //Go through each layer which needs to be synchronized.
+                    foreach (KeyValuePair<int, StateChange> item in _unsynchronizedLayerStates)
                     {
-                        _writer.WriteByte(parameterIndex);
-                        _writer.WriteSingle(next, AutoPackType.Packed);
-                        _floats[pd.TypeIndex] = next;
+                        /* If a frame has not passed since the state was created
+                         * then do not send it until next tick. State changes take 1 frame
+                         * to be processed by Unity, this check ensures that. */
+                        if (frameCount == item.Value.FrameCount)
+                            continue;
+
+                        //Add to layers being sent. This is so they can be removed from the collection later.
+                        sentLayers.Add(item.Key);
+                        int layerIndex = item.Key;
+                        StateChange sc = item.Value;
+                        //If a regular state change.
+                        if (!sc.IsCrossfade)
+                        {
+                            if (ReturnCurrentLayerState(out int stateHash, out float normalizedTime, layerIndex))
+                            {
+                                _writer.WriteUInt8Unpacked(STATE);
+                                _writer.WriteUInt8Unpacked((byte)layerIndex);
+                                //Current hash will always be too large to compress.
+                                _writer.WriteInt32Unpacked(stateHash);
+                                _writer.WriteSingle(normalizedTime);
+                            }
+                        }
+                        //When it's a crossfade then send crossfade data.
+                        else
+                        {
+                            _writer.WriteUInt8Unpacked(CROSSFADE);
+                            _writer.WriteUInt8Unpacked((byte)layerIndex);
+                            //Current hash will always be too large to compress.
+                            _writer.WriteInt32(sc.Hash);
+                            _writer.WriteBoolean(sc.FixedTime);
+                            //Times usually can be compressed.
+                            _writer.WriteSingle(sc.DurationTime);
+                            _writer.WriteSingle(sc.OffsetTime);
+                            _writer.WriteSingle(sc.NormalizedTransitionTime);
+                        }
+                    }
+
+                    if (sentLayers.Count > 0)
+                    {
+                        for (int i = 0; i < sentLayers.Count; i++)
+                            _unsynchronizedLayerStates.Remove(sentLayers[i]);
+                        //Store cache.
+                        CollectionCaches<int>.Store(sentLayers);
                     }
                 }
-                /* Int. */
-                else if (pd.ControllerParameter.type == AnimatorControllerParameterType.Int)
+
+                /* Layer weights. */
+                for (int layerIndex = 0; layerIndex < _layerWeights.Length; layerIndex++)
                 {
-                    int next = _animator.GetInteger(pd.Hash);
-                    //If changed.
-                    if (forceAll || _ints[pd.TypeIndex] != next)
+                    float next = _animator.GetLayerWeight(layerIndex);
+                    if (forceAll || _layerWeights[layerIndex] != next)
                     {
-                        _writer.WriteByte(parameterIndex);
-                        _writer.WriteInt32(next, AutoPackType.Packed);
-                        _ints[pd.TypeIndex] = next;
+                        _writer.WriteUInt8Unpacked(LAYER_WEIGHT);
+                        _writer.WriteUInt8Unpacked((byte)layerIndex);
+                        _writer.WriteSingle(next);
+                        _layerWeights[layerIndex] = next;
                     }
                 }
-            }
 
-            /* Don't need to force trigger sends since
-             * they're one-shots. */
-            for (int i = 0; i < _triggerUpdates.Count; i++)
-            {
-                _writer.WriteByte(_triggerUpdates[i].ParameterIndex);
-                _writer.WriteBoolean(_triggerUpdates[i].Setting);
-            }
-            _triggerUpdates.Clear();
-
-            /* States. */
-            if (forceAll)
-            {
-                //Add all layers to layer states.
-                for (int i = 0; i < _animator.layerCount; i++)
-                    _unsynchronizedLayerStates[i] = new StateChange();
-            }
-
-            //Go through each layer which needs to be synchronized.
-            foreach (KeyValuePair<int, StateChange> item in _unsynchronizedLayerStates)
-            {
-                int layerIndex = item.Key;
-                StateChange sc = item.Value;
-                //If a regular state change.
-                if (!sc.IsCrossfade)
+                /* Speed is similar to layer weights but we don't need the index,
+                 * only the indicator and value. */
+                float speedNext = _animator.speed;
+                if (forceAll || _speed != speedNext)
                 {
-                    if (ReturnCurrentLayerState(out int stateHash, out float normalizedTime, layerIndex))
-                    {
-                        _writer.WriteByte(STATE);
-                        _writer.WriteByte((byte)layerIndex);
-                        //Current hash will always be too large to compress.
-                        _writer.WriteInt32(stateHash);
-                        _writer.WriteSingle(normalizedTime, AutoPackType.Packed);
-                    }
+                    _writer.WriteUInt8Unpacked(SPEED);
+                    _writer.WriteSingle(speedNext);
+                    _speed = speedNext;
                 }
-                //When it's a crossfade then send crossfade data.
-                else
-                {
-                    _writer.WriteByte(CROSSFADE);
-                    _writer.WriteByte((byte)layerIndex);
-                    //Current hash will always be too large to compress.
-                    _writer.WriteInt32(sc.Hash);
-                    _writer.WriteBoolean(sc.FixedTime);
-                    //Times usually can be compressed.
-                    _writer.WriteSingle(sc.DurationTime, AutoPackType.Packed);
-                    _writer.WriteSingle(sc.OffsetTime, AutoPackType.Packed);
-                    _writer.WriteSingle(sc.NormalizedTransitionTime, AutoPackType.Packed);
-                }
-            }
-            _unsynchronizedLayerStates.Clear();
 
-            /* Layer weights. */
-            for (int layerIndex = 0; layerIndex < _layerWeights.Length; layerIndex++)
-            {
-                float next = _animator.GetLayerWeight(layerIndex);
-                if (forceAll || _layerWeights[layerIndex] != next)
-                {
-                    _writer.WriteByte(LAYER_WEIGHT);
-                    _writer.WriteByte((byte)layerIndex);
-                    _writer.WriteSingle(next, AutoPackType.Packed);
-                    _layerWeights[layerIndex] = next;
-                }
-            }
+                //Nothing to update.
+                if (_writer.Position == 0)
+                    return false;
 
-            /* Speed is similar to layer weights but we don't need the index,
-             * only the indicator and value. */
-            float speedNext = _animator.speed;
-            if (forceAll || _speed != speedNext)
-            {
-                _writer.WriteByte(SPEED);
-                _writer.WriteSingle(speedNext, AutoPackType.Packed);
-                _speed = speedNext;
-            }
-
-            //Nothing to update.
-            if (_writer.Position == 0)
-            {
-                return false;
-            }
-            else
-            {
                 updatedBytes = _writer.GetArraySegment();
                 return true;
             }
@@ -960,66 +1078,59 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Applies changed parameters to the animator.
         /// </summary>
-        /// <param name="changedParameters"></param>
+        /// <param name = "changedParameters"></param>
         private void ApplyParametersUpdated(ref ArraySegment<byte> updatedParameters)
         {
-            if (!_isAnimatorEnabled)
-                return;
-            if (_layerWeights == null)
-                return;
-            if (updatedParameters.Count == 0)
-                return;
-            //Exit if client authoritative and has authority.
-            if (ClientAuthoritative && base.IsOwner)
-                return;
-            //Exit if not client authoritative, but also not sync to owner, and is owner.
-            if (!ClientAuthoritative && !_sendToOwner && base.IsOwner)
-                return;
-            //Exit if trying to apply when server and not client authoritative.
-            if (base.IsServer && !ClientAuthoritative)
-                return;
-
-            try
+            using (_pm_ApplyParametersUpdated.Auto())
             {
-                using (PooledReader reader = ReaderPool.GetReader(updatedParameters, base.NetworkManager))
+                if (!_canSynchronizeAnimator)
+                    return;
+                if (_layerWeights == null)
+                    return;
+                if (updatedParameters.Count == 0)
+                    return;
+
+                PooledReader reader = ReaderPool.Retrieve(updatedParameters, NetworkManager);
+
+                try
                 {
                     while (reader.Remaining > 0)
                     {
-                        byte parameterIndex = reader.ReadByte();
+                        byte parameterIndex = reader.ReadUInt8Unpacked();
                         //Layer weight
                         if (parameterIndex == LAYER_WEIGHT)
                         {
-                            byte layerIndex = reader.ReadByte();
-                            float value = reader.ReadSingle(AutoPackType.Packed);
+                            byte layerIndex = reader.ReadUInt8Unpacked();
+                            float value = reader.ReadSingle();
                             _animator.SetLayerWeight((int)layerIndex, value);
                         }
                         //Speed.
                         else if (parameterIndex == SPEED)
                         {
-                            float value = reader.ReadSingle(AutoPackType.Packed);
+                            float value = reader.ReadSingle();
                             _animator.speed = value;
                         }
                         //State.
                         else if (parameterIndex == STATE)
                         {
-                            byte layerIndex = reader.ReadByte();
+                            byte layerIndex = reader.ReadUInt8Unpacked();
                             //Hashes will always be too large to compress.
-                            int hash = reader.ReadInt32();
-                            float normalizedTime = reader.ReadSingle(AutoPackType.Packed);
+                            int hash = reader.ReadInt32Unpacked();
+                            float normalizedTime = reader.ReadSingle();
                             //Play results.
                             _animator.Play(hash, layerIndex, normalizedTime);
                         }
                         //Crossfade.
                         else if (parameterIndex == CROSSFADE)
                         {
-                            byte layerIndex = reader.ReadByte();
+                            byte layerIndex = reader.ReadUInt8Unpacked();
                             //Hashes will always be too large to compress.
                             int hash = reader.ReadInt32();
                             bool useFixedTime = reader.ReadBoolean();
                             //Get time values.
-                            float durationTime = reader.ReadSingle(AutoPackType.Packed);
-                            float offsetTime = reader.ReadSingle(AutoPackType.Packed);
-                            float normalizedTransitionTime = reader.ReadSingle(AutoPackType.Packed);
+                            float durationTime = reader.ReadSingle();
+                            float offsetTime = reader.ReadSingle();
+                            float normalizedTransitionTime = reader.ReadSingle();
                             //If using fixed.
                             if (useFixedTime)
                                 _animator.CrossFadeInFixedTime(hash, durationTime, layerIndex, offsetTime, normalizedTransitionTime);
@@ -1038,15 +1149,15 @@ namespace FishNet.Component.Animating
                             //Float.
                             else if (acpt == AnimatorControllerParameterType.Float)
                             {
-                                float value = reader.ReadSingle(AutoPackType.Packed);
+                                float value = reader.ReadSingle();
                                 //If able to smooth floats.
                                 if (_canSmoothFloats)
                                 {
                                     float currentValue = _animator.GetFloat(_parameterDetails[parameterIndex].Hash);
-                                    float past = (float)base.TimeManager.TickDelta;
+                                    float past = (float)TimeManager.TickDelta;
                                     //float past = _synchronizeInterval + INTERPOLATION;
                                     float rate = Mathf.Abs(currentValue - value) / past;
-                                    _smoothedFloats[_parameterDetails[parameterIndex].Hash] = new SmoothedFloat(rate, value);
+                                    _smoothedFloats[_parameterDetails[parameterIndex].Hash] = new(rate, value);
                                 }
                                 else
                                 {
@@ -1071,49 +1182,43 @@ namespace FishNet.Component.Animating
                             //Unhandled.
                             else
                             {
-                                Debug.LogWarning($"Unhandled parameter type of {acpt}.");
+                                NetworkManager.LogWarning($"Unhandled parameter type of {acpt}.");
                             }
                         }
                     }
                 }
-            }
-            catch
-            {
-                Debug.LogWarning("An error occurred while applying updates. This may occur when malformed data is sent or when you change the animator or controller but not on all connections.");
+                catch
+                {
+                    NetworkManager.LogWarning("An error occurred while applying updates. This may occur when malformed data is sent or when you change the animator or controller but not on all connections.");
+                }
+                finally
+                {
+                    reader?.Store();
+                }
             }
         }
 
         /// <summary>
         /// Outputs the current state and time for a layer. Returns true if stateHash is not 0.
         /// </summary>
-        /// <param name="stateHash"></param>
-        /// <param name="normalizedTime"></param>
-        /// <param name="results"></param>
-        /// <param name="layerIndex"></param>
+        /// <param name = "stateHash"></param>
+        /// <param name = "normalizedTime"></param>
+        /// <param name = "results"></param>
+        /// <param name = "layerIndex"></param>
         /// <returns></returns>
         private bool ReturnCurrentLayerState(out int stateHash, out float normalizedTime, int layerIndex)
         {
             stateHash = 0;
             normalizedTime = 0f;
 
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return false;
 
             AnimatorStateInfo st = _animator.GetCurrentAnimatorStateInfo(layerIndex);
             stateHash = st.fullPathHash;
             normalizedTime = st.normalizedTime;
 
-            return (stateHash != 0);
-        }
-
-        /// <summary>
-        /// Forces values to send next update regardless of time remaining.
-        /// Can be useful if you have a short lasting parameter that you want to ensure goes through.
-        /// </summary>
-        public void ForceSend()
-        {
-            //_nextClientSendTime = 0f;
-            //_nextServerSendTime = 0f;
+            return stateHash != 0;
         }
 
         /// <summary>
@@ -1123,7 +1228,6 @@ namespace FishNet.Component.Animating
         public void SendAll()
         {
             _forceAllOnTimed = true;
-            ForceSend();
         }
 
         #region Play.
@@ -1134,6 +1238,7 @@ namespace FishNet.Component.Animating
         {
             Play(Animator.StringToHash(name));
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1142,6 +1247,7 @@ namespace FishNet.Component.Animating
             for (int i = 0; i < _animator.layerCount; i++)
                 Play(hash, i, 0f);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1149,6 +1255,7 @@ namespace FishNet.Component.Animating
         {
             Play(Animator.StringToHash(name), layer);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1156,6 +1263,7 @@ namespace FishNet.Component.Animating
         {
             Play(hash, layer, 0f);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1163,19 +1271,21 @@ namespace FishNet.Component.Animating
         {
             Play(Animator.StringToHash(name), layer, normalizedTime);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
         public void Play(int hash, int layer, float normalizedTime)
         {
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
-            if (_animator.HasState(layer, hash))
+            if (_animator.HasState(layer, hash) || hash == 0)
             {
                 _animator.Play(hash, layer, normalizedTime);
-                _unsynchronizedLayerStates[layer] = new StateChange();
+                _unsynchronizedLayerStates[layer] = new(Time.frameCount);
             }
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1183,6 +1293,7 @@ namespace FishNet.Component.Animating
         {
             PlayInFixedTime(Animator.StringToHash(name), fixedTime);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1191,6 +1302,7 @@ namespace FishNet.Component.Animating
             for (int i = 0; i < _animator.layerCount; i++)
                 PlayInFixedTime(hash, i, fixedTime);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
@@ -1198,17 +1310,18 @@ namespace FishNet.Component.Animating
         {
             PlayInFixedTime(Animator.StringToHash(name), layer, fixedTime);
         }
+
         /// <summary>
         /// Plays a state.
         /// </summary>
         public void PlayInFixedTime(int hash, int layer, float fixedTime)
         {
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
-            if (_animator.HasState(layer, hash))
+            if (_animator.HasState(layer, hash) || hash == 0)
             {
                 _animator.PlayInFixedTime(hash, layer, fixedTime);
-                _unsynchronizedLayerStates[layer] = new StateChange();
+                _unsynchronizedLayerStates[layer] = new(Time.frameCount);
             }
         }
         #endregion
@@ -1217,61 +1330,64 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Creates a crossfade from the current state to any other state using normalized times.
         /// </summary>
-        /// <param name="stateName"></param>
-        /// <param name="normalizedTransitionDuration"></param>
-        /// <param name="layer"></param>
-        /// <param name="normalizedTimeOffset"></param>
-        /// <param name="normalizedTransitionTime"></param>
+        /// <param name = "stateName"></param>
+        /// <param name = "normalizedTransitionDuration"></param>
+        /// <param name = "layer"></param>
+        /// <param name = "normalizedTimeOffset"></param>
+        /// <param name = "normalizedTransitionTime"></param>
         public void CrossFade(string stateName, float normalizedTransitionDuration, int layer, float normalizedTimeOffset = float.NegativeInfinity, float normalizedTransitionTime = 0.0f)
         {
             CrossFade(Animator.StringToHash(stateName), normalizedTransitionDuration, layer, normalizedTimeOffset, normalizedTransitionTime);
         }
+
         /// <summary>
         /// Creates a crossfade from the current state to any other state using normalized times.
         /// </summary>
-        /// <param name="hash"></param>
-        /// <param name="normalizedTransitionDuration"></param>
-        /// <param name="layer"></param>
-        /// <param name="normalizedTimeOffset"></param>
-        /// <param name="normalizedTransitionTime"></param>
+        /// <param name = "hash"></param>
+        /// <param name = "normalizedTransitionDuration"></param>
+        /// <param name = "layer"></param>
+        /// <param name = "normalizedTimeOffset"></param>
+        /// <param name = "normalizedTransitionTime"></param>
         public void CrossFade(int hash, float normalizedTransitionDuration, int layer, float normalizedTimeOffset = 0.0f, float normalizedTransitionTime = 0.0f)
         {
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
-            if (_animator.HasState(layer, hash))
+            if (_animator.HasState(layer, hash) || hash == 0)
             {
                 _animator.CrossFade(hash, normalizedTransitionDuration, layer, normalizedTimeOffset, normalizedTransitionTime);
-                _unsynchronizedLayerStates[layer] = new StateChange(hash, false, normalizedTransitionDuration, normalizedTimeOffset, normalizedTransitionTime);
+                _unsynchronizedLayerStates[layer] = new(Time.frameCount, hash, false, normalizedTransitionDuration, normalizedTimeOffset, normalizedTransitionTime);
             }
         }
+
         /// <summary>
         /// Creates a crossfade from the current state to any other state using times in seconds.
         /// </summary>
-        /// <param name="stateName"></param>
-        /// <param name="fixedTransitionDuration"></param>
-        /// <param name="layer"></param>
-        /// <param name="fixedTimeOffset"></param>
-        /// <param name="normalizedTransitionTime"></param>
+        /// <param name = "stateName"></param>
+        /// <param name = "fixedTransitionDuration"></param>
+        /// <param name = "layer"></param>
+        /// <param name = "fixedTimeOffset"></param>
+        /// <param name = "normalizedTransitionTime"></param>
         public void CrossFadeInFixedTime(string stateName, float fixedTransitionDuration, int layer, float fixedTimeOffset = 0.0f, float normalizedTransitionTime = 0.0f)
         {
             CrossFadeInFixedTime(Animator.StringToHash(stateName), fixedTransitionDuration, layer, fixedTimeOffset, normalizedTransitionTime);
         }
+
         /// <summary>
         /// Creates a crossfade from the current state to any other state using times in seconds.
         /// </summary>
-        /// <param name="hash"></param>
-        /// <param name="fixedTransitionDuration"></param>
-        /// <param name="layer"></param>
-        /// <param name="fixedTimeOffset"></param>
-        /// <param name="normalizedTransitionTime"></param>
+        /// <param name = "hash"></param>
+        /// <param name = "fixedTransitionDuration"></param>
+        /// <param name = "layer"></param>
+        /// <param name = "fixedTimeOffset"></param>
+        /// <param name = "normalizedTransitionTime"></param>
         public void CrossFadeInFixedTime(int hash, float fixedTransitionDuration, int layer, float fixedTimeOffset = 0.0f, float normalizedTransitionTime = 0.0f)
         {
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
-            if (_animator.HasState(layer, hash))
+            if (_animator.HasState(layer, hash) || hash == 0)
             {
                 _animator.CrossFadeInFixedTime(hash, fixedTransitionDuration, layer, fixedTimeOffset, normalizedTransitionTime);
-                _unsynchronizedLayerStates[layer] = new StateChange(hash, true, fixedTransitionDuration, fixedTimeOffset, normalizedTransitionTime);
+                _unsynchronizedLayerStates[layer] = new(Time.frameCount, hash, true, fixedTransitionDuration, fixedTimeOffset, normalizedTransitionTime);
             }
         }
         #endregion
@@ -1280,17 +1396,18 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Sets a trigger on the animator and sends it over the network.
         /// </summary>
-        /// <param name="hash"></param>
+        /// <param name = "hash"></param>
         public void SetTrigger(int hash)
         {
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
             UpdateTrigger(hash, true);
         }
+
         /// <summary>
         /// Sets a trigger on the animator and sends it over the network.
         /// </summary>
-        /// <param name="hash"></param>
+        /// <param name = "hash"></param>
         public void SetTrigger(string name)
         {
             SetTrigger(Animator.StringToHash(name));
@@ -1299,15 +1416,16 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Resets a trigger on the animator and sends it over the network.
         /// </summary>
-        /// <param name="hash"></param>
+        /// <param name = "hash"></param>
         public void ResetTrigger(int hash)
         {
             UpdateTrigger(hash, false);
         }
+
         /// <summary>
         /// Resets a trigger on the animator and sends it over the network.
         /// </summary>
-        /// <param name="hash"></param>
+        /// <param name = "hash"></param>
         public void ResetTrigger(string name)
         {
             ResetTrigger(Animator.StringToHash(name));
@@ -1316,21 +1434,26 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Updates a trigger, sets or resets.
         /// </summary>
-        /// <param name="set"></param>
+        /// <param name = "set"></param>
         private void UpdateTrigger(int hash, bool set)
         {
-            if (!_isAnimatorEnabled)
-                return;
-            /* Allow triggers to run on owning client if using client authority,
-             * as well when not using client authority but also not using synchronize to owner.
-             * This allows clients to run animations locally while maintaining server authority. */
-            //Using client authority but not owner.
-            if (ClientAuthoritative && !base.IsOwner)
+            if (!_canSynchronizeAnimator)
                 return;
 
-            //Also block if not using client authority, synchronizing to owner, and not server.
-            if (!ClientAuthoritative && _sendToOwner && !base.IsServer)
-                return;
+            bool clientAuth = ClientAuthoritative;
+            //If there is an owner perform checks.
+            if (Owner.IsValid)
+            {
+                //If client auth and not owner.
+                if (clientAuth && !IsOwner)
+                    return;
+            }
+            //There is no owner.
+            else
+            {
+                if (!IsServerStarted)
+                    return;
+            }
 
             //Update locally.
             if (set)
@@ -1338,10 +1461,12 @@ namespace FishNet.Component.Animating
             else
                 _animator.ResetTrigger(hash);
 
-            /* Can send if not client auth but is server,
-            * or if client auth and owner. */
-            bool canSend = (!ClientAuthoritative && base.IsServer) ||
-                (ClientAuthoritative && base.IsOwner);
+            /* Can send if any of the following are true:
+             * ClientAuth + Owner.
+             * ClientAuth + No Owner + IsServer
+             * !ClientAuth + IsServer. */
+            bool canSend = (clientAuth && IsOwner) || (clientAuth && !Owner.IsValid) || (!clientAuth && IsServerStarted);
+
             //Only queue a send if proper side.
             if (canSend)
             {
@@ -1349,12 +1474,12 @@ namespace FishNet.Component.Animating
                 {
                     if (_parameterDetails[i].Hash == hash)
                     {
-                        _triggerUpdates.Add(new TriggerUpdate(i, set));
+                        _triggerUpdates.Add(new(i, set));
                         return;
                     }
                 }
                 //Fall through, hash not found.
-                Debug.LogWarning($"Hash {hash} not found while trying to update a trigger.");
+                NetworkManager.LogWarning($"Hash {hash} not found while trying to update a trigger.");
             }
         }
         #endregion
@@ -1363,33 +1488,50 @@ namespace FishNet.Component.Animating
         /// <summary>
         /// Called on clients to receive an animator update.
         /// </summary>
-        /// <param name="data"></param>
-        [ObserversRpc]
-        private void ObserversAnimatorUpdated(ArraySegment<byte> data)
-        {
-            ServerDataReceived(ref data);
-        }
-        /// <summary>
-        /// Called on clients to receive an animator update.
-        /// </summary>
-        /// <param name="data"></param>
-        [TargetRpc]
+        /// <param name = "data"></param>
+        [TargetRpc(ValidateTarget = false)]
         private void TargetAnimatorUpdated(NetworkConnection connection, ArraySegment<byte> data)
         {
-            ServerDataReceived(ref data);
+            if (!_canSynchronizeAnimator)
+                return;
+
+            //If receiver is client host then do nothing, clientHost need not process.
+            if (IsServerInitialized && connection.IsLocalClient)
+                return;
+
+            bool clientAuth = ClientAuthoritative;
+            bool isOwner = IsOwner;
+            /* If set for client auth and owner then do not process.
+             * This could be the case if an update was meant to come before
+             * ownership gain but came out of late due to out of order when using unreliable.
+             * Cannot check sendToOwner given clients may not
+             * always be aware of owner depending on ShareIds setting. */
+            if (clientAuth && isOwner)
+                return;
+            /* If not client auth and not to send to owner, and is owner
+             * then also return. */
+            if (!clientAuth && !_sendToOwner && isOwner)
+                return;
+
+            ReceivedServerData rd = new(data);
+            _fromServerBuffer.Enqueue(rd);
+
+            if (_startTick == 0)
+                _startTick = TimeManager.LocalTick + _interpolation;
         }
+
         /// <summary>
         /// Called on server to receive an animator update.
         /// </summary>
-        /// <param name="data"></param>
+        /// <param name = "data"></param>
         [ServerRpc]
         private void ServerAnimatorUpdated(ArraySegment<byte> data)
         {
-            if (!_isAnimatorEnabled)
+            if (!_canSynchronizeAnimator)
                 return;
             if (!ClientAuthoritative)
             {
-                base.Owner.Kick(KickReason.ExploitAttempt, LoggingType.Common, $"Connection Id {base.Owner.ClientId} has been kicked for trying to update this object without client authority.");
+                Owner.Kick(KickReason.ExploitAttempt, LoggingType.Common, $"Connection Id {Owner.ClientId} has been kicked for trying to update this object without client authority.");
                 return;
             }
 
@@ -1401,49 +1543,17 @@ namespace FishNet.Component.Animating
             ApplyParametersUpdated(ref data);
             _clientAuthoritativeUpdates.AddToBuffer(ref data);
         }
-        /// <summary>
-        /// Called on clients to receive an animator update.
-        /// </summary>
-        /// <param name="data"></param>
-        private void ServerDataReceived(ref ArraySegment<byte> data)
-        {
-            if (!_isAnimatorEnabled)
-                return;
-            //If also server, client host, then do nothing. Animations already ran on server.
-            if (base.IsServer)
-                return;
-
-            //If has authority.
-            if (base.IsOwner)
-            {
-                //No need to sync to self if client authoritative.
-                if (ClientAuthoritative)
-                    return;
-                //Not client authoritative, but also don't sync to owner.
-                else if (!ClientAuthoritative && !_sendToOwner)
-                    return;
-            }
-
-            ReceivedServerData rd = new ReceivedServerData(data);
-            _fromServerBuffer.Enqueue(rd);
-
-            if (_startTick == uint.MaxValue)
-                _startTick = (base.TimeManager.LocalTick + _interpolation);
-            //ApplyParametersUpdated(ref data);
-        }
         #endregion
 
         #region Editor.
-#if UNITY_EDITOR
+        #if UNITY_EDITOR
         protected override void Reset()
         {
             base.Reset();
             if (_animator == null)
                 SetAnimator(GetComponent<Animator>());
         }
-#endif
+        #endif
         #endregion
-
     }
 }
-

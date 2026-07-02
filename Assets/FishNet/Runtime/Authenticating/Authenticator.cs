@@ -33,7 +33,7 @@ namespace FishNet.Authenticating
         /// <summary>
         /// Initializes this script for use.
         /// </summary>
-        /// <param name="networkManager"></param>
+        /// <param name = "networkManager"></param>
         public virtual void InitializeOnce(NetworkManager networkManager)
         {
             NetworkManager = networkManager;
@@ -43,9 +43,7 @@ namespace FishNet.Authenticating
         /// <summary>
         /// Called on the server immediately after a client connects. Can be used to send data to the client for authentication.
         /// </summary>
-        /// <param name="connection">Connection which is not yet authenticated.</param>
+        /// <param name = "connection">Connection which is not yet authenticated.</param>
         public virtual void OnRemoteConnection(NetworkConnection connection) { }
     }
-
-
 }

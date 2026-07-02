@@ -2,6 +2,7 @@ using FishNet;
 using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Component.Transforming;
+using FishNet.Transporting;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -10,25 +11,37 @@ using UnityEngine.UI;
 public class FishController : NetworkBehaviour
 {
     #region Types.
-    public struct MoveData
+    public struct MoveData : IReplicateData
     {
         public float Horizontal;
         public float Vertical;
         public bool Sprint;
         public bool Jump;
         public float HorizontalMouse;
+
+        private uint _tick;
+        public void Dispose() { }
+        public uint GetTick() => _tick;
+        public void SetTick(uint value) => _tick = value;
     }
-    public struct ReconcileData
+    public struct ReconcileData : IReconcileData
     {
         public Vector3 Position;
         public Quaternion Rotation;
         public Vector3 Velocity;
+        private uint _tick;
+
         public ReconcileData(Vector3 position, Quaternion rotation, Vector3 velocity)
         {
             Position = position;
             Rotation = rotation;
             Velocity = velocity;
+            _tick = 0;
         }
+
+        public void Dispose() { }
+        public uint GetTick() => _tick;
+        public void SetTick(uint value) => _tick = value;
     }
 
     private struct RagdollPart
@@ -139,7 +152,7 @@ public class FishController : NetworkBehaviour
     {
         base.OnStartClient();
 
-        _characterController.enabled = (base.IsServer || base.IsOwner);        
+        _characterController.enabled = (base.IsServerInitialized || base.IsOwner);
 
         if (IsOwner)
         {
@@ -181,17 +194,15 @@ public class FishController : NetworkBehaviour
     {
         if (base.IsOwner)
         {
-            Reconciliation(default, false);
             CheckInput(out MoveData md);
-            Move(md, false);
+            Move(md);
         }
-        if (base.IsServer)
+        else if (base.IsServerInitialized)
         {
-            Move(default, true);
-            //ReconcileData rd = new ReconcileData(transform.position, transform.rotation, _velocity);
-            ReconcileData rd = new ReconcileData(transform.position, transform.rotation, _characterController.velocity);
-            Reconciliation(rd, true);
+            Move(default);
         }
+
+        CreateReconcile();
     }
 
 
@@ -232,12 +243,16 @@ public class FishController : NetworkBehaviour
         _horizontalMouse = horizontal;
     }
 
+    // FishNet v4 prediction signature.
     [Replicate]
-    private void Move(MoveData md, bool asServer, bool replaying = false)
+    private void Move(
+        MoveData md,
+        ReplicateState state = ReplicateState.Invalid,
+        Channel channel = Channel.Unreliable)
     {
-        if (asServer || replaying)
+        if (IsServerInitialized || state.ContainsReplayed())
             MoveWithData(md, (float)base.TimeManager.TickDelta);
-        else if (!asServer)
+        else
             _clientMoveData = md;
     }
 
@@ -248,7 +263,8 @@ public class FishController : NetworkBehaviour
 
         _velocity = _characterController.velocity;
 
-        bool shouldJump = _lastJumpTick != InstanceFinder.TimeManager.LastPacketTick && md.Jump;
+        uint packetTick = InstanceFinder.TimeManager.LastPacketTick.Value();
+        bool shouldJump = _lastJumpTick != packetTick && md.Jump;
 
         // Vertical velocity
         if (shouldJump && (_characterController.isGrounded || _jumpCount < maxJumpCount))
@@ -256,7 +272,7 @@ public class FishController : NetworkBehaviour
             // Apply initial jump force
             _verticalVelocity = Mathf.Sqrt(jumpHeight * -2.0f * Physics.gravity.y * mass);
             ++_jumpCount;
-            _lastJumpTick = InstanceFinder.TimeManager.LastPacketTick;
+            _lastJumpTick = packetTick;
         }
         else
         {
@@ -327,12 +343,22 @@ public class FishController : NetworkBehaviour
     }
 
     [Reconcile]
-    private void Reconciliation(ReconcileData rd, bool asServer)
+    private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
     {
         transform.position = rd.Position;
         transform.rotation = rd.Rotation;
         _characterController.velocity.Set(rd.Velocity.x, rd.Velocity.y, rd.Velocity.z);
         //_velocity = rd.Velocity;
+    }
+
+    /// <summary>Builds the authoritative movement snapshot required by FishNet prediction.</summary>
+    public override void CreateReconcile()
+    {
+        ReconcileData data = new ReconcileData(
+            transform.position,
+            transform.rotation,
+            _characterController.velocity);
+        Reconciliation(data);
     }
 
 
@@ -423,14 +449,14 @@ public class FishController : NetworkBehaviour
         if (_gun != null)
         {
             _gun.GetComponent<NetworkObject>().RemoveOwnership();
-            if (IsServerOnly) { 
+            if (IsServerOnlyInitialized) {
                 DropItemAction();
         }
             DropItemClientRpc();
         }
     }
 
-    [ObserversRpc(IncludeOwner = true, BufferLast = true)]
+    [ObserversRpc(BufferLast = true)]
     private void DropItemClientRpc()
     {
    
@@ -442,7 +468,7 @@ public class FishController : NetworkBehaviour
 
     private void EquipItemAction(Gun newGun)
     {
-        if (IsServer)
+        if (IsServerInitialized)
         {
             Debug.Log("Server Equip Gun");
         }
@@ -485,7 +511,7 @@ public class FishController : NetworkBehaviour
             NetworkObject nob = newGun.GetComponent<NetworkObject>();
             nob.GiveOwnership(base.Owner);
 
-            if (IsServerOnly)
+            if (IsServerOnlyInitialized)
             {
                 Debug.Log("Equip Item Call on Server");
                 EquipItemAction(newGun);
@@ -494,7 +520,7 @@ public class FishController : NetworkBehaviour
         }
     }
 
-    [ObserversRpc(IncludeOwner = true, BufferLast = true)]
+    [ObserversRpc(BufferLast = true)]
     private void EquipItemClientRpc(int ObjectId)
     {
         NetworkObject no = InstanceFinder.ClientManager.Objects.Spawned[ObjectId];

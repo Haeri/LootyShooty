@@ -36,10 +36,8 @@ public class ViewController : NetworkBehaviour
     private Vector2 _recoil;
     private Vector2 _recoilReverse;
 
-    [SyncVar]
-    public bool isAds = false;
-    [SyncVar]
-    public int sightIndex = 0;
+    public readonly SyncVar<bool> isAds = new(false);
+    public readonly SyncVar<int> sightIndex = new(0);
 
 
 
@@ -109,7 +107,7 @@ public class ViewController : NetworkBehaviour
         }
 
 
-        if (isAds)
+        if (isAds.Value)
         {
             if (IsOwner)
             {
@@ -123,7 +121,7 @@ public class ViewController : NetworkBehaviour
             if (_gun != null)
             {
                 int len = _gun.sights.Count;
-                int index = Math.Abs(sightIndex % len);
+                int index = Math.Abs(sightIndex.Value % len);
 
                 pos = _gun.sights[index].sightTransform.localPosition * -1;
                 rot = Quaternion.Inverse(_gun.sights[index].sightTransform.localRotation);
@@ -179,12 +177,12 @@ public class ViewController : NetworkBehaviour
     [ServerRpc]
     public void setADSServerRPC(bool ads)
     {
-        isAds = ads;
+        isAds.Value = ads;
     }
 
     public void cycleSight(float input)
     {
-        if (isAds)
+        if (isAds.Value)
         {
             cycleSightServerRPC(input);
         }
@@ -193,9 +191,9 @@ public class ViewController : NetworkBehaviour
     [ServerRpc]
     public void cycleSightServerRPC(float input)
     {
-        if (isAds)
+        if (isAds.Value)
         {
-            sightIndex += Math.Sign(input);
+            sightIndex.Value += Math.Sign(input);
         }
     }
 

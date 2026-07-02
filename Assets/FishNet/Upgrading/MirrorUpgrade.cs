@@ -14,16 +14,9 @@ using FishNet.Editing;
 using System.IO;
 using System.Collections;
 using Mirror;
-using MirrorExperimentalNetworkTransformBase = Mirror.Experimental.NetworkTransformBase;
-using MirrorExperimentalNetworkTransformChild = Mirror.Experimental.NetworkTransformChild;
 using MirrorNetworkTransformBase = Mirror.NetworkTransformBase;
 using MirrorNetworkTransformChild = Mirror.NetworkTransformChild;
 using MirrorNetworkAnimator = Mirror.NetworkAnimator;
-#if !MIRROR_57_0_OR_NEWER
-using MirrorNetworkProximityChecker = Mirror.NetworkProximityChecker;
-using MirrorNetworkSceneChecker = Mirror.NetworkSceneChecker;
-#endif
-
 #if FGG_ASSETS
 using FlexNetworkAnimator = FirstGearGames.Mirrors.Assets.FlexNetworkAnimators.FlexNetworkAnimator;
 using FlexNetworkTransformBase = FirstGearGames.Mirrors.Assets.FlexNetworkTransforms.FlexNetworkTransformBase;
@@ -36,7 +29,6 @@ using FlexSceneChecker = FirstGearGames.FlexSceneManager.FlexSceneChecker;
 
 namespace FishNet.Upgrading.Mirror.Editing
 {
-
     /* IMPORTANT IMPORTANT IMPORTANT IMPORTANT 
     * If you receive errors about missing Mirror components,
     * such as NetworkIdentity, then remove MIRROR and any other
@@ -94,10 +86,7 @@ namespace FishNet.Upgrading.Mirror.Editing
         /// True if initialized.
         /// </summary>
         private bool _initialized;
-
-
         private const string OBJECT_NAME_PREFIX = "MirrorUpgrade";
-
 
         private void Awake()
         {
@@ -145,7 +134,7 @@ namespace FishNet.Upgrading.Mirror.Editing
 
             GameObject go = _gameObjects[_goIndex];
             _goIndex++;
-            //Go went empty?
+            // Go went empty?
             if (go == null)
                 return;
 
@@ -191,14 +180,13 @@ namespace FishNet.Upgrading.Mirror.Editing
                 _goIndex--;
                 return;
             }
-            //NetworkIdentity must be done last.
+            // NetworkIdentity must be done last.
             if (IterateNetworkIdentity(go))
             {
                 _changed = true;
                 _replacedNetworkIdentities++;
             }
         }
-
 
         /// <summary>
         /// Finds Condition scripts to be used with NetworkObserver.
@@ -211,7 +199,7 @@ namespace FishNet.Upgrading.Mirror.Editing
             if (_sceneCondition == null)
             {
                 scriptableObjects = Finding.GetScriptableObjects<SceneCondition>(true, true);
-                //Use the first found scene condition, there should be only one.
+                // Use the first found scene condition, there should be only one.
                 if (scriptableObjects.Count > 0)
                     _sceneCondition = (SceneCondition)scriptableObjects[0];
 
@@ -239,7 +227,6 @@ namespace FishNet.Upgrading.Mirror.Editing
             }
         }
 
-
         private bool IterateNetworkTransform(GameObject go)
         {
             if (go.TryGetComponent(out MirrorNetworkTransformBase nt1))
@@ -250,16 +237,6 @@ namespace FishNet.Upgrading.Mirror.Editing
                 else
                     target = go.transform;
                 Replace(nt1, target);
-                return true;
-            }
-            if (go.TryGetComponent(out MirrorExperimentalNetworkTransformBase nt2))
-            {
-                Transform target;
-                if (nt2 is MirrorExperimentalNetworkTransformChild mc1)
-                    target = mc1.target;
-                else
-                    target = go.transform;
-                Replace(nt2, target);
                 return true;
             }
 #if FGG_ASSETS
@@ -279,7 +256,7 @@ namespace FishNet.Upgrading.Mirror.Editing
                     target.gameObject.AddComponent<FNNetworkTransform>();
             }
 
-            //Fall through, nothing was replaced.
+            // Fall through, nothing was replaced.
             return false;
         }
 
@@ -312,18 +289,11 @@ namespace FishNet.Upgrading.Mirror.Editing
             return false;
         }
 
-
         private bool IterateSceneChecker(GameObject go)
         {
-#if !MIRROR_57_0_OR_NEWER
             if (_sceneCondition == null)
                 return false;
 
-            if (go.TryGetComponent(out MirrorNetworkSceneChecker msc))
-            {
-                Replace(msc);
-                return true;
-            }
 #if FGG_PROJECTS
             if (go.TryGetComponent(out FlexSceneChecker fsc))
             {
@@ -351,28 +321,19 @@ namespace FishNet.Upgrading.Mirror.Editing
                     }
                 }
 
-                //If not able to find scene condition then add one.
+                // If not able to find scene condition then add one.
                 if (!conditionFound)
                     networkObserver.ObserverConditionsInternal.Add(_sceneCondition);
             }
 
-#endif
             return false;
         }
 
-
-
         private bool IterateProximityChecker(GameObject go)
         {
-#if !MIRROR_57_0_OR_NEWER
             if (_distanceCondition == null)
                 return false;
 
-            if (go.TryGetComponent(out MirrorNetworkProximityChecker mnpc))
-            {
-                Replace(mnpc);
-                return true;
-            }
 #if FGG_PROJECTS
             if (go.TryGetComponent(out FastProximityChecker fpc))
             {
@@ -400,15 +361,13 @@ namespace FishNet.Upgrading.Mirror.Editing
                     }
                 }
 
-                //If not able to find scene condition then add one.
+                // If not able to find scene condition then add one.
                 if (!conditionFound)
                     networkObserver.ObserverConditionsInternal.Add(_distanceCondition);
             }
-#endif
 
             return false;
         }
-
 
         private bool IterateNetworkIdentity(GameObject go)
         {
@@ -417,7 +376,7 @@ namespace FishNet.Upgrading.Mirror.Editing
                 EditorUtility.SetDirty(go);
                 DestroyImmediate(netIdentity, true);
 
-                //Add nob if doesn't exist.
+                // Add nob if doesn't exist.
                 if (!go.TryGetComponent<NetworkObject>(out _))
                     go.AddComponent<NetworkObject>();
 
@@ -427,14 +386,11 @@ namespace FishNet.Upgrading.Mirror.Editing
             return false;
         }
 
-
         private static void PrintSaveWarning()
         {
             Debug.LogWarning("You must File -> Save for changes to complete.");
         }
     }
-
-
 }
 #endif
 #endif

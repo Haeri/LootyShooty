@@ -1,7 +1,24 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace FishNet.Transporting
 {
+    /// <summary>
+    /// Container for connected clients state for a client.
+    /// </summary>
+    public struct ConnectedClientsArgs
+    {
+        /// <summary>
+        /// Collection of client ids connected to the server.
+        /// </summary>
+        public List<int> ClientIds { get; private set; }
+
+        public ConnectedClientsArgs(List<int> clientIds)
+        {
+            ClientIds = clientIds;
+        }
+    }
+
     /// <summary>
     /// Container about data received on the server.
     /// </summary>
@@ -38,6 +55,7 @@ namespace FishNet.Transporting
             TransportIndex = transportIndex;
             FinalizeMethod = null;
         }
+
         public ServerReceivedDataArgs(ArraySegment<byte> data, Channel channel, int connectionId, int transportIndex, Action finalizeMethod)
         {
             Data = data;
@@ -47,7 +65,6 @@ namespace FishNet.Transporting
             FinalizeMethod = finalizeMethod;
         }
     }
-
 
     /// <summary>
     /// Container about data received on the local client.
@@ -75,8 +92,6 @@ namespace FishNet.Transporting
             TransportIndex = transportIndex;
         }
     }
-
-
 
     /// <summary>
     /// Container about a connection state change for a client.
@@ -121,7 +136,7 @@ namespace FishNet.Transporting
         public LocalConnectionState ConnectionState;
 
         public ServerConnectionStateArgs(LocalConnectionState connectionState, int transportIndex)
-        {            
+        {
             ConnectionState = connectionState;
             TransportIndex = transportIndex;
         }
@@ -143,10 +158,9 @@ namespace FishNet.Transporting
         public int TransportIndex;
 
         public ClientConnectionStateArgs(LocalConnectionState connectionState, int transportIndex)
-        {            
+        {
             ConnectionState = connectionState;
             TransportIndex = transportIndex;
         }
     }
 }
-

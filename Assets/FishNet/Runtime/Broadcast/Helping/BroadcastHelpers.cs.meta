@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 8e1af86a4a1b048cf80aec98e48d3292
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 207815
+  packageName: 'FishNet: Networking Evolved'
+  packageVersion: 4.7.2R
+  assetPath: Assets/FishNet/Runtime/Broadcast/Helping/BroadcastHelpers.cs
+  uploadId: 901598

@@ -86,7 +86,7 @@ public class Gun : NetworkBehaviour
 
     public void SetEquiped(bool equiped)
     {
-        if (IsServer)
+        if (IsServerInitialized)
         {
             GetComponent<Rigidbody>().isKinematic = equiped;
         }
@@ -100,7 +100,7 @@ public class Gun : NetworkBehaviour
         ShootServerRpc(0);
 
         // Dont perform action on the host, as Host is also server
-        if (!IsServer)
+        if (!IsServerInitialized)
         {
             // Perform action locally
             if (bullets > 0)
@@ -133,7 +133,7 @@ public class Gun : NetworkBehaviour
         {
             b.GetComponent<Projectile>().shooter = transform.parent.parent.parent.gameObject;
         }
-        b.GetComponent<Rigidbody>().velocity = transform.forward * muzzleVelocity;
+        b.GetComponent<Rigidbody>().linearVelocity = transform.forward * muzzleVelocity;
 
         if (transform.parent != null)
         {
@@ -165,7 +165,7 @@ public class Gun : NetworkBehaviour
         }
     }
 
-    [ObserversRpc(IncludeOwner = false)]
+    [ObserversRpc(ExcludeOwner = true)]
     private void ShootClientRpc(ulong shooter)
     {
         // Replicate shooting on all clients except for the original one
@@ -179,7 +179,7 @@ public class Gun : NetworkBehaviour
     {
         ReloadServerRPC(0);
 
-        if (!IsServer)
+        if (!IsServerInitialized)
         {
             ReloadAction(false);
         }
@@ -213,7 +213,7 @@ public class Gun : NetworkBehaviour
         ReloadClientRPC(initialtor);
     }
 
-    [ObserversRpc(IncludeOwner = false)]
+    [ObserversRpc(ExcludeOwner = true)]
     private void ReloadClientRPC(ulong initialtor)
     {
         //if (initialtor != NetworkManager.LocalClientId)
