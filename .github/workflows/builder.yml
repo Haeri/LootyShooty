@@ -10,19 +10,27 @@ on:
 jobs:
   build:
     name: Build ${{ matrix.artifactName }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - targetPlatform: StandaloneWindows64
             artifactName: LootyShooty-Windows64
+            os: windows-latest
+            uploadPath: build/LootyShooty-Windows64
           - targetPlatform: StandaloneOSX
             artifactName: LootyShooty-OSX
+            os: macos-latest
+            uploadPath: build/LootyShooty-OSX.zip
           - targetPlatform: StandaloneLinux64
             artifactName: LootyShooty-Linux64
+            os: ubuntu-latest
+            uploadPath: build/LootyShooty-Linux64
           - targetPlatform: StandaloneLinux64
             artifactName: LootyShooty-Server-Linux64
+            os: ubuntu-latest
+            uploadPath: build/LootyShooty-Server-Linux64
             extraArgs: -standaloneBuildSubtarget Server
             modules: linux-server
     steps:
@@ -61,8 +69,13 @@ jobs:
           build-target: ${{ matrix.targetPlatform }}
           args: -quit -batchmode -executeMethod CIBuild.Build -buildPath build/${{ matrix.artifactName }} -buildName ${{ matrix.artifactName }} ${{ matrix.extraArgs }}
 
+      - name: Package macOS App
+        if: matrix.targetPlatform == 'StandaloneOSX'
+        run: ditto -c -k --sequesterRsrc --keepParent "build/${{ matrix.artifactName }}/${{ matrix.artifactName }}.app" "${{ matrix.uploadPath }}"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifactName }}
-          path: build/${{ matrix.artifactName }}
+          path: ${{ matrix.uploadPath }}
+          if-no-files-found: error

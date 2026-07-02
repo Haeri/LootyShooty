@@ -20,6 +20,25 @@ public static class CIBuild
         string buildName = GetArgument("-buildName") ?? Application.productName;
 
         BuildTarget target = EditorUserBuildSettings.activeBuildTarget;
+        string requestedTargetName = GetArgument("-buildTarget");
+        if (!string.IsNullOrEmpty(requestedTargetName))
+        {
+            if (!Enum.TryParse(requestedTargetName, true, out BuildTarget requestedTarget))
+            {
+                Debug.LogError($"CIBuild: unknown requested build target '{requestedTargetName}'.");
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            if (requestedTarget != target)
+            {
+                Debug.LogError(
+                    $"CIBuild: requested {requestedTarget}, but Unity activated {target}. " +
+                    "The runner probably does not support the requested platform or its module is missing.");
+                EditorApplication.Exit(1);
+                return;
+            }
+        }
         string[] scenes = EditorBuildSettings.scenes
             .Where(scene => scene.enabled)
             .Select(scene => scene.path)
