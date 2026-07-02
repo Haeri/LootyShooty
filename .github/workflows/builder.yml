@@ -1,7 +1,7 @@
 name: Builder
 on:
   push:
-    branches: 
+    branches:
     - main
     - fishnet
 
@@ -20,56 +20,62 @@ jobs:
           - Linux64
     steps:
       - name: Download Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
       - name: Check Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: Library
           key: Library-${{ matrix.targetPlatform }}
-          restore-keys: Library-      
+          restore-keys: Library-
       - name: Build Project
-        uses: game-ci/unity-builder@v2
+        uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           buildName: LootyShooty-${{ matrix.targetPlatform }}
           buildsPath: build
           targetPlatform: Standalone${{ matrix.targetPlatform }}
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: LootyShooty-${{ matrix.targetPlatform }}
           path: build
-  
+
   buildServer:
     name: Build Server Linux64
     runs-on: ubuntu-latest
     steps:
       - name: Download Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
       - name: Check Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: Library
           key: Library-Server-StandaloneLinux64
           restore-keys: Library-Server-
       - name: Build Project
-        uses: game-ci/unity-builder@v2
+        uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          customParameters: -EnableHeadlessMode
+          # -EnableHeadlessMode is gone in modern Unity; dedicated servers
+          # are a standalone build subtarget instead.
+          customParameters: -standaloneBuildSubtarget Server
           buildName: LootyShooty-Server-Linux64
           buildsPath: build
           targetPlatform: StandaloneLinux64
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: LootyShooty-Server-Linux64
           path: build
