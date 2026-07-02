@@ -11,10 +11,133 @@ namespace LootyShooty.Editor
 {
     /// <summary>
     /// Converts legacy Built-in materials to the URP version installed by this project.
-    /// The automatic pass is idempotent; the menu item can be used after importing old assets.
+    /// The targeted menu passes can be used after importing old assets.
     /// </summary>
     internal static class UrpMaterialUpgrade
     {
+        private const string M4PrefabPath = "Assets/Prefabs/Weapons/M4A1.prefab";
+
+        [MenuItem("Tools/LootyShooty/Repair M4 Materials")]
+        private static void RepairM4MaterialAssignments()
+        {
+            Material common = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/Models/M4A1_PBR/Materials/M4A1_Common.mat");
+            Material sights = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/Models/M4A1_PBR/Materials/M4A1_Sights.mat");
+            Material stockRail = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/Models/M4A1_PBR/Materials/M4A1_Stock_Rail.mat");
+            if (common == null || sights == null || stockRail == null)
+            {
+                Debug.LogError("M4 material repair could not find all three external PBR materials.");
+                return;
+            }
+
+            GameObject root = PrefabUtility.LoadPrefabContents(M4PrefabPath);
+            int repairedSlots = 0;
+            try
+            {
+                foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    Material[] materials = renderer.sharedMaterials;
+                    bool changed = false;
+                    for (int i = 0; i < materials.Length; i++)
+                    {
+                        Material replacement = GetM4Replacement(materials[i], renderer.name, common, sights, stockRail);
+                        if (replacement == null || materials[i] == replacement)
+                            continue;
+
+                        materials[i] = replacement;
+                        repairedSlots++;
+                        changed = true;
+                    }
+
+                    if (changed)
+                        renderer.sharedMaterials = materials;
+                }
+
+                if (repairedSlots > 0)
+                    PrefabUtility.SaveAsPrefabAsset(root, M4PrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+
+            Debug.Log($"M4 material repair complete: {repairedSlots} embedded/fallback material slots replaced.");
+        }
+
+        private static Material GetM4Replacement(
+            Material current,
+            string rendererName,
+            Material common,
+            Material sights,
+            Material stockRail)
+        {
+            string materialName = current != null ? current.name : string.Empty;
+            if (materialName.IndexOf("M4A1_Sights", StringComparison.OrdinalIgnoreCase) >= 0)
+                return sights;
+            if (materialName.IndexOf("M4A1_Stock_Rail", StringComparison.OrdinalIgnoreCase) >= 0)
+                return stockRail;
+            if (materialName.IndexOf("M4A1_Common", StringComparison.OrdinalIgnoreCase) >= 0)
+                return common;
+
+            // Only infer a replacement for missing/model-embedded slots. Leave attachments alone.
+            string currentPath = current != null ? AssetDatabase.GetAssetPath(current) : string.Empty;
+            if (current != null && !currentPath.EndsWith("M4A1_PBR.fbx", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (rendererName.IndexOf("Sight", StringComparison.OrdinalIgnoreCase) >= 0)
+                return sights;
+            if (rendererName.IndexOf("Stock", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                rendererName.IndexOf("Handguard", StringComparison.OrdinalIgnoreCase) >= 0)
+                return stockRail;
+            return common;
+        }
+
+        [MenuItem("Tools/LootyShooty/Upgrade Used Materials to URP")]
+        private static void UpgradeUsedMaterials()
+        {
+            var materialPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var rootGuids = new HashSet<string>(AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" }));
+            rootGuids.UnionWith(AssetDatabase.FindAssets("t:Scene", new[] { "Assets" }));
+            foreach (string guid in rootGuids)
+            {
+                string rootPath = AssetDatabase.GUIDToAssetPath(guid);
+                foreach (string dependency in AssetDatabase.GetDependencies(rootPath, true))
+                {
+                    if (dependency.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
+                        materialPaths.Add(dependency);
+                }
+            }
+
+            int upgraded = 0;
+            int customFallbacks = 0;
+            foreach (string path in materialPaths)
+            {
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (material == null || material.shader == null)
+                    continue;
+
+                string shaderName = material.shader.name;
+                if (shaderName.StartsWith("Universal Render Pipeline/", StringComparison.Ordinal))
+                    continue;
+                if (TryUpgradeCustomShader(material, shaderName))
+                {
+                    EditorUtility.SetDirty(material);
+                    customFallbacks++;
+                }
+                else if (TryUpgradeLegacyBuiltInShader(material, shaderName))
+                {
+                    EditorUtility.SetDirty(material);
+                    upgraded++;
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log($"Used-material URP pass complete: {upgraded} legacy and {customFallbacks} custom " +
+                      $"materials converted; {materialPaths.Count} referenced material assets checked.");
+        }
+
         [MenuItem("Tools/LootyShooty/Upgrade All Materials to URP")]
         private static void UpgradeFromMenu()
         {
@@ -108,11 +231,6 @@ namespace LootyShooty.Editor
                 case "Unlit/FireFlyNew":
                     targetShader = "Universal Render Pipeline/Unlit";
                     transparent = true;
-                    alphaClip = false;
-                    break;
-                case "Universal Render Pipeline/2D/Mesh2D-Lit-Default":
-                    targetShader = "Universal Render Pipeline/Lit";
-                    transparent = false;
                     alphaClip = false;
                     break;
                 case "Legacy Shaders/Particles/Additive":

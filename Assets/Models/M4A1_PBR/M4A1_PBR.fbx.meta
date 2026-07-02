@@ -109,6 +109,22 @@ ModelImporter:
     13700022: M4A1_RearSight
     13700024: M4A1_Receiver
     13700026: M4A1_Stock
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M4A1_Common
+    second: {fileID: 2100000, guid: 6998a40f5ee111d478023bb894e7b6fb, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M4A1_Sights
+    second: {fileID: 2100000, guid: 2a17ae4f8d839d24f87bc41f382f36c6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M4A1_Stock_Rail
+    second: {fileID: 2100000, guid: 94b89a74d36974b4baf82c003488c6ed, type: 2}
   materials:
     importMaterials: 1
     materialName: 0

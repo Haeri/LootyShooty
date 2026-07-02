@@ -30,8 +30,8 @@ public class Damagable : NetworkBehaviour
 
         health.Value -= amount;
         OnDamage?.Invoke(amount);
-        
-        if(health.Value < 0)
+
+        if(health.Value <= 0)
         {
             health.Value = 0;
             OnDeath?.Invoke();

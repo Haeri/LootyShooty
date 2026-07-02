@@ -129,10 +129,15 @@ public class Gun : NetworkBehaviour
         b.transform.position = muzzle.position;
         b.transform.rotation = muzzle.rotation;
         b.GetComponent<Projectile>().blank = !isRealAction;
-        if (transform.parent != null)
+
+        // Resolve the wielder by searching upward; hardcoded parent chains
+        // break whenever the holder hierarchy changes.
+        FishController wielder = GetComponentInParent<FishController>();
+        if (wielder != null)
         {
-            b.GetComponent<Projectile>().shooter = transform.parent.parent.parent.gameObject;
+            b.GetComponent<Projectile>().shooter = wielder.gameObject;
         }
+
         b.GetComponent<Rigidbody>().linearVelocity = transform.forward * muzzleVelocity;
 
         if (transform.parent != null)
@@ -141,7 +146,9 @@ public class Gun : NetworkBehaviour
             //transform.parent.localPosition += Util.vec3FromRandomAngle(kickback * 0.001f, kickbackRandomScalar);
             transform.parent.localRotation = Quaternion.Euler(recoil) * transform.parent.localRotation;
 
-            transform.parent.parent.GetComponent<ViewController>().AddRecoid(mouseRecoil);
+            ViewController view = GetComponentInParent<ViewController>();
+            if (view != null)
+                view.AddRecoid(mouseRecoil);
         }
     }
 

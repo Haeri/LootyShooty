@@ -1,10 +1,13 @@
 using FishNet;
+using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Component.Transforming;
 using FishNet.Transporting;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations.Rigging;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -17,7 +20,10 @@ public class FishController : NetworkBehaviour
         public float Vertical;
         public bool Sprint;
         public bool Jump;
-        public float HorizontalMouse;
+        // Absolute view angles. The owner controls aim locally; the server
+        // applies these so simulation and shooting direction match the client.
+        public float Yaw;
+        public float Pitch;
 
         private uint _tick;
         public void Dispose() { }
@@ -27,15 +33,17 @@ public class FishController : NetworkBehaviour
     public struct ReconcileData : IReconcileData
     {
         public Vector3 Position;
-        public Quaternion Rotation;
         public Vector3 Velocity;
+        public float VerticalVelocity;
+        public int JumpCount;
         private uint _tick;
 
-        public ReconcileData(Vector3 position, Quaternion rotation, Vector3 velocity)
+        public ReconcileData(Vector3 position, Vector3 velocity, float verticalVelocity, int jumpCount)
         {
             Position = position;
-            Rotation = rotation;
             Velocity = velocity;
+            VerticalVelocity = verticalVelocity;
+            JumpCount = jumpCount;
             _tick = 0;
         }
 
@@ -72,20 +80,34 @@ public class FishController : NetworkBehaviour
     [Header("Interaction")]
     public float maxPickupDistance = 5;
 
+    [Header("Life")]
+    [SerializeField] private float respawnDelay = 10f;
+
+    [Header("Animation")]
+    [SerializeField] private float animMultiplier = 1f;
+
+    [Header("Feedback")]
+    [SerializeField] private AudioClip hitConfirmSound;
 
     [Header("References")]
     [SerializeField] private GameObject _cameraObject;
     [SerializeField] private GameObject _cameraRoot;    
     [SerializeField] private GameObject _gunHolder;
     [SerializeField] private GameObject _graphics;
+    [SerializeField] private TwoBoneIKConstraint _leftHandIk;
+    [SerializeField] private TwoBoneIKConstraint _rightHandIk;
+    [SerializeField] private Transform _leftHandTarget;
     #endregion
 
     #region Private.
     // References
     private CharacterController _characterController;
-    private MoveData _clientMoveData;
     private InputMaster _inputMaster;
     private ViewController _viewController;
+    private Damagable _damagable;
+    private Animator _animator;
+    private AudioSource _feedbackAudioSource;
+    private Renderer[] _ownerRenderers;
 
 
     private Text _itemText;
@@ -99,7 +121,8 @@ public class FishController : NetworkBehaviour
     private Gun _gun;
 
 
-    //private bool _isShooting;
+    private bool _isShooting;
+    private Vector3 _spawnPosition;
 
     private Vector3 _velocity = new Vector3(0, 0, 0);
     private Vector3 _acceleration = new Vector3(0, 0, 0);
@@ -111,9 +134,6 @@ public class FishController : NetworkBehaviour
 
     private float _verticalVelocity = 0f;
     private int _jumpCount = 0;
-    private uint _lastJumpTick = 0;
-
-    private float _horizontalMouse = 0;
 
     private List<RagdollPart> _ragdoll_parts = new List<RagdollPart>();
 
@@ -123,15 +143,15 @@ public class FishController : NetworkBehaviour
     {
         _viewController = GetComponent<ViewController>();
         _characterController = GetComponent<CharacterController>();
+        _damagable = GetComponent<Damagable>();
+        _animator = GetComponentInChildren<Animator>();
+        _feedbackAudioSource = GetComponent<AudioSource>();
+        // _ownerRenderers = _graphics.GetComponentsInChildren<Renderer>(true);
 
         _accelerationStrength = maxSpeed / accelerationTime;
         _decelerationStrength = -maxSpeed / decelerationTime;
         _airAccelerationStrength = maxSpeed / airAccelerationTime;
         _airDecelerationStrength = -maxSpeed / airDecelerationTime;
-
-        InstanceFinder.TimeManager.OnTick += TimeManager_OnTick;
-        InstanceFinder.TimeManager.OnUpdate += TimeManager_OnUpdate;
-        
 
         foreach (Collider c in _graphics.GetComponentsInChildren<Collider>())
         {
@@ -146,13 +166,55 @@ public class FishController : NetworkBehaviour
         }
 
         toggleRagdoll(false);
+        SetWeaponIk(null);
+    }
+
+    public override void OnStartNetwork()
+    {
+        base.OnStartNetwork();
+
+        base.TimeManager.OnTick += TimeManager_OnTick;
+        base.TimeManager.OnUpdate += TimeManager_OnUpdate;
+    }
+
+    public override void OnStopNetwork()
+    {
+        base.OnStopNetwork();
+
+        if (base.TimeManager != null)
+        {
+            base.TimeManager.OnTick -= TimeManager_OnTick;
+            base.TimeManager.OnUpdate -= TimeManager_OnUpdate;
+        }
+    }
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+
+        _spawnPosition = transform.position;
+
+        if (_damagable != null)
+        {
+            _damagable.OnDamage += Server_OnDamage;
+            _damagable.OnDeath += Server_OnDeath;
+        }
+    }
+
+    public override void OnStopServer()
+    {
+        base.OnStopServer();
+
+        if (_damagable != null)
+        {
+            _damagable.OnDamage -= Server_OnDamage;
+            _damagable.OnDeath -= Server_OnDeath;
+        }
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
-
-        _characterController.enabled = (base.IsServerInitialized || base.IsOwner);
 
         if (IsOwner)
         {
@@ -161,118 +223,143 @@ public class FishController : NetworkBehaviour
 
             _inputMaster = new InputMaster();
             _inputMaster.Player.Move.performed += ctx => _moveInput = ctx.ReadValue<Vector2>();
+            _inputMaster.Player.Move.canceled += ctx => _moveInput = Vector2.zero;
             _inputMaster.Player.Sprint.started += ctx => _sprintInput = true;
             _inputMaster.Player.Sprint.canceled += ctx => _sprintInput = false;
             _inputMaster.Player.Jump.performed += ctx => _jumpInput = true;
-            //_inputMaster.Player.Reload.performed += ctx => Reload();
-            //_inputMaster.Player.Fire.started += ctx => _isShooting = true;
-            //_inputMaster.Player.Fire.canceled += ctx => _isShooting = false;
-            //_inputMaster.Player.ADS.started += ctx => doAds(true);
-            //_inputMaster.Player.ADS.canceled += ctx => doAds(false);
-            //_inputMaster.Player.CycleSight.performed += ctx => cycleSight(ctx.ReadValue<float>());
+            _inputMaster.Player.Reload.performed += ctx => Reload();
+            _inputMaster.Player.Fire.started += ctx => _isShooting = true;
+            _inputMaster.Player.Fire.canceled += ctx => _isShooting = false;
+            _inputMaster.Player.ADS.started += ctx => _viewController.setADS(true);
+            _inputMaster.Player.ADS.canceled += ctx => _viewController.setADS(false);
+            _inputMaster.Player.CycleSight.performed += ctx => _viewController.cycleSight(ctx.ReadValue<float>());
             _inputMaster.Player.Drop.performed += ctx => DropItemServerRpc();
             _inputMaster.Player.Take.performed += ctx => PckupItemServerRPC();
             _inputMaster.Enable();
 
-            _graphics.SetActive(false);
+            SetOwnerGraphicsHidden(true);
 
             _itemTextPanel = UIManager.Instance.itemTextPanel;
             _itemText = _itemTextPanel.transform.GetChild(0).GetComponent<Text>();
         }
     }
 
-    private void OnDestroy()
+    public override void OnStopClient()
     {
-        if (InstanceFinder.TimeManager != null)
+        base.OnStopClient();
+
+        /* Ownership is already cleared during despawn, so the IsOwner guards
+         * in OnDisable never run - tear the input down explicitly or a stale
+         * InputMaster keeps firing RPCs from a dead pawn. */
+        if (_inputMaster != null)
         {
-            InstanceFinder.TimeManager.OnTick -= TimeManager_OnTick;
-            InstanceFinder.TimeManager.OnUpdate -= TimeManager_OnUpdate;
+            _inputMaster.Disable();
+            _inputMaster.Dispose();
+            _inputMaster = null;
         }
+
+        SetOwnerGraphicsHidden(false);
     }
 
     private void TimeManager_OnTick()
     {
-        if (base.IsOwner)
-        {
-            CheckInput(out MoveData md);
-            Move(md);
-        }
-        else if (base.IsServerInitialized)
-        {
-            Move(default);
-        }
-
+        // Runs on everyone: the owner builds real input, the server consumes the
+        // owner's queued inputs, and observers consume forwarded states.
+        Move(BuildMoveData());
         CreateReconcile();
     }
 
 
     private void TimeManager_OnUpdate()
     {
-        if (base.IsOwner)
+        bool isDead = _damagable != null && _damagable.IsDead();
+
+        if (base.IsOwner && !isDead)
         {
             itemPickupCheck();
-            MoveWithData(_clientMoveData, Time.deltaTime);
+
+            if (_isShooting && _gun != null)
+            {
+                _gun.Shoot();
+            }
+        }
+
+        UpdateAnimator();
+    }
+
+    private void Reload()
+    {
+        if (_gun != null)
+        {
+            _gun.Reload();
         }
     }
 
-    private void CheckInput(out MoveData md)
+    /// <summary>Feeds the simulated velocity into the walk animation. Runs on every instance.</summary>
+    private void UpdateAnimator()
     {
-        //Debug.Log(_moveInput);
-        md = default;
+        if (_animator == null || !_animator.isActiveAndEnabled)
+            return;
 
-        float horizontal = _moveInput.x;
-        float vertical = _moveInput.y;
+        Vector3 localVel = transform.InverseTransformDirection(_velocity);
+        localVel = (localVel / maxShiftSpeed) * 2f * animMultiplier;
+        _animator.SetFloat("VelocityX", localVel.x);
+        _animator.SetFloat("VelocityZ", localVel.z);
+    }
 
-        //if (horizontal == 0f && vertical == 0f && !_jumpInput && _horizontalMouse == 0f)
-        //    return;
+    private MoveData BuildMoveData()
+    {
+        if (!base.IsOwner)
+            return default;
 
-        md = new MoveData()
+        MoveData md = new MoveData()
         {
-            Horizontal = horizontal,
-            Vertical = vertical,
+            Horizontal = _moveInput.x,
+            Vertical = _moveInput.y,
             Sprint = _sprintInput,
             Jump = _jumpInput,
-            HorizontalMouse = _horizontalMouse
+            Yaw = transform.eulerAngles.y,
+            Pitch = _viewController.Pitch
         };
 
         _jumpInput = false;
+
+        return md;
     }
 
-    public void Rotate(float horizontal)
-    {
-        _horizontalMouse = horizontal;
-    }
-
-    // FishNet v4 prediction signature.
     [Replicate]
     private void Move(
         MoveData md,
         ReplicateState state = ReplicateState.Invalid,
         Channel channel = Channel.Unreliable)
     {
-        if (IsServerInitialized || state.ContainsReplayed())
-            MoveWithData(md, (float)base.TimeManager.TickDelta);
-        else
-            _clientMoveData = md;
+        /* The owner already rotates itself in real time via ViewController.
+         * Everyone else (server, observers) applies the owner's view angles,
+         * but only from inputs the owner actually created - default data
+         * (e.g. dropped packets) would snap the view to zero. */
+        if (!base.IsOwner && state.ContainsCreated())
+        {
+            transform.rotation = Quaternion.Euler(0f, md.Yaw, 0f);
+            _cameraRoot.transform.localRotation = Quaternion.Euler(md.Pitch, 0f, 0f);
+        }
+
+        MoveWithData(md, (float)base.TimeManager.TickDelta);
     }
 
     private void MoveWithData(MoveData md, float delta)
     {
-        Vector2 move = new Vector3(md.Horizontal, md.Vertical);
+        // No movement while dead; the ragdoll takes over until respawn.
+        if (_damagable != null && _damagable.IsDead())
+            return;
 
-
-        _velocity = _characterController.velocity;
-
-        uint packetTick = InstanceFinder.TimeManager.LastPacketTick.Value();
-        bool shouldJump = _lastJumpTick != packetTick && md.Jump;
+        Vector2 move = new Vector2(md.Horizontal, md.Vertical);
 
         // Vertical velocity
-        if (shouldJump && (_characterController.isGrounded || _jumpCount < maxJumpCount))
+        if (md.Jump && (_characterController.isGrounded || _jumpCount < maxJumpCount))
         {
             // Apply initial jump force
             _verticalVelocity = Mathf.Sqrt(jumpHeight * -2.0f * Physics.gravity.y * mass);
             ++_jumpCount;
-            _lastJumpTick = packetTick;
         }
         else
         {
@@ -323,32 +410,42 @@ public class FishController : NetworkBehaviour
         }
 
         _velocity += _acceleration * delta;
+        _velocity.y = 0f;
 
         float speedcap = md.Sprint ? maxShiftSpeed : maxSpeed;
 
-
-        // Cap horizontal speed 
-        if (new Vector2(_velocity.x, _velocity.z).magnitude > speedcap)
+        // Cap horizontal speed
+        if (_velocity.magnitude > speedcap)
         {
-            _velocity.y = 0;
             _velocity = _velocity.normalized * speedcap;
-
         }
 
-        _velocity.y = _verticalVelocity;
+        Vector3 frameVelocity = _velocity;
+        frameVelocity.y = _verticalVelocity;
 
-
-        _characterController.Move(_velocity * delta);
-        transform.Rotate(Vector3.up * md.HorizontalMouse);
+        /* Measure how far the controller really moved so collisions
+         * (walls, slopes) feed back into the simulated velocity. This keeps
+         * the client's replayed prediction consistent with the server. */
+        Vector3 positionBefore = transform.position;
+        _characterController.Move(frameVelocity * delta);
+        Vector3 actualVelocity = (transform.position - positionBefore) / delta;
+        _velocity.x = actualVelocity.x;
+        _velocity.z = actualVelocity.z;
     }
 
     [Reconcile]
     private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
     {
+        _velocity = rd.Velocity;
+        _verticalVelocity = rd.VerticalVelocity;
+        _jumpCount = rd.JumpCount;
+
+        /* The CharacterController must be disabled while teleporting,
+         * otherwise its internal physics position lags one simulate behind
+         * the transform. */
+        _characterController.enabled = false;
         transform.position = rd.Position;
-        transform.rotation = rd.Rotation;
-        _characterController.velocity.Set(rd.Velocity.x, rd.Velocity.y, rd.Velocity.z);
-        //_velocity = rd.Velocity;
+        _characterController.enabled = true;
     }
 
     /// <summary>Builds the authoritative movement snapshot required by FishNet prediction.</summary>
@@ -356,8 +453,9 @@ public class FishController : NetworkBehaviour
     {
         ReconcileData data = new ReconcileData(
             transform.position,
-            transform.rotation,
-            _characterController.velocity);
+            _velocity,
+            _verticalVelocity,
+            _jumpCount);
         Reconciliation(data);
     }
 
@@ -438,20 +536,24 @@ public class FishController : NetworkBehaviour
 
         _gun = null;
         _viewController.EquipGun(null);
-
-        //right_hand_ik.weight = 0;
-        //left_hand_ik.weight = 0;
+        SetWeaponIk(null);
     }
 
     [ServerRpc]
     private void DropItemServerRpc()
     {
+        ServerDropItem();
+    }
+
+    private void ServerDropItem()
+    {
         if (_gun != null)
         {
             _gun.GetComponent<NetworkObject>().RemoveOwnership();
-            if (IsServerOnlyInitialized) {
+            if (IsServerOnlyInitialized)
+            {
                 DropItemAction();
-        }
+            }
             DropItemClientRpc();
         }
     }
@@ -486,11 +588,7 @@ public class FishController : NetworkBehaviour
         _gun.SetEquiped(true);
 
         _viewController.EquipGun(_gun);
-
-        //left_arm_target.localPosition = _gun.handle.localPosition;
-        //left_arm_target.localRotation = _gun.handle.localRotation;
-        //right_hand_ik.weight = 1;
-        //left_hand_ik.weight = 1;
+        SetWeaponIk(_gun);
     }
 
     [ServerRpc]
@@ -529,9 +627,109 @@ public class FishController : NetworkBehaviour
         EquipItemAction(newGun);
     }
 
+    #region Death & respawn.
+    private void Server_OnDamage(int amount)
+    {
+        // Show the damage flash on the victim's screen.
+        if (base.Owner.IsValid)
+            TargetDamageFlash(base.Owner);
+    }
+
+    private void Server_OnDeath()
+    {
+        ServerDropItem();
+        SetDeadObserversRpc(true);
+        StartCoroutine(Server_RespawnAfterDelay());
+    }
+
+    private IEnumerator Server_RespawnAfterDelay()
+    {
+        yield return new WaitForSeconds(respawnDelay);
+
+        // Teleport server-side; clients follow through the reconcile.
+        _characterController.enabled = false;
+        transform.position = _spawnPosition;
+        _characterController.enabled = true;
+        _velocity = Vector3.zero;
+        _verticalVelocity = 0f;
+        _jumpCount = 0;
+
+        _damagable.ResetHealth();
+        SetDeadObserversRpc(false);
+    }
+
+    [ObserversRpc(BufferLast = true)]
+    private void SetDeadObserversRpc(bool dead)
+    {
+        toggleRagdoll(dead);
+
+        if (IsOwner)
+        {
+            _viewController.enabled = !dead;
+            if (dead)
+                _isShooting = false;
+        }
+    }
+
+    [TargetRpc]
+    private void TargetDamageFlash(NetworkConnection conn)
+    {
+        if (UIManager.Instance != null && UIManager.Instance.damagemarker != null)
+            UIManager.Instance.damagemarker.GetComponent<UIFader>().ResetFade();
+    }
+
+    /// <summary>Called by a server-authoritative projectile after this pawn lands a hit.</summary>
+    public void ServerNotifyHit()
+    {
+        if (!IsServerInitialized || !base.Owner.IsValid)
+            return;
+
+        TargetHitFeedback(base.Owner);
+    }
+
+    [TargetRpc]
+    private void TargetHitFeedback(NetworkConnection conn)
+    {
+        if (_feedbackAudioSource != null && hitConfirmSound != null)
+            _feedbackAudioSource.PlayOneShot(hitConfirmSound);
+
+        if (UIManager.Instance != null && UIManager.Instance.hitmarker != null)
+            UIManager.Instance.hitmarker.GetComponent<UIFader>().ResetFade();
+    }
+    #endregion
+
+    #region First-person visuals and weapon IK.
+    private void SetOwnerGraphicsHidden(bool hidden)
+    {
+        if (_ownerRenderers == null)
+            return;
+
+        foreach (Renderer characterRenderer in _ownerRenderers)
+        {
+            if (characterRenderer != null)
+                characterRenderer.forceRenderingOff = hidden;
+        }
+    }
+
+    private void SetWeaponIk(Gun gun)
+    {
+        bool equipped = gun != null && gun.handle != null;
+
+        if (equipped && _leftHandTarget != null)
+            _leftHandTarget.SetPositionAndRotation(gun.handle.position, gun.handle.rotation);
+
+        if (_leftHandIk != null)
+            _leftHandIk.weight = equipped ? 1f : 0f;
+        if (_rightHandIk != null)
+            _rightHandIk.weight = equipped ? 1f : 0f;
+    }
+    #endregion
+
     private void toggleRagdoll(bool toggle)
     {
-        //_animator.enabled = !toggle;
+        // The animator must release the bones while ragdolling.
+        if (_animator != null)
+            _animator.enabled = !toggle;
 
         if (toggle)
         {

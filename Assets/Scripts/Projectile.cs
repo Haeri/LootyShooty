@@ -32,10 +32,13 @@ public class Projectile : MonoBehaviour
             // Do damage
             if (!blank && !dmg.IsDead())
             {
-                damage = (int)(damage * multiplier);
-                Debug.Log($"Player({shooter.GetComponent<NetworkPlayer>().playerName.Value}) shot {dmg.name}. {dmg.health.Value}hp -> {dmg.health.Value - damage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
-                bool died = dmg.TakeDamage(damage);
-                //shooter?.GetComponent<PlayerController>()?.enemyHitCallback(dmg.gameObject, damage, died);                
+                int appliedDamage = Mathf.RoundToInt(damage * multiplier);
+                // The shooter is the pawn, which carries no NetworkPlayer; it may
+                // also already be destroyed by the time the bullet lands.
+                string shooterName = shooter != null ? shooter.name : "unknown";
+                Debug.Log($"Player({shooterName}) shot {dmg.name}. {dmg.health.Value}hp -> {dmg.health.Value - appliedDamage}hp." + (multiplier != 1 ? $" Multiplier({multiplier})" : ""));
+                dmg.TakeDamage(appliedDamage);
+                shooter?.GetComponent<FishController>()?.ServerNotifyHit();
             }
 
             // Display hit FX

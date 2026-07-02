@@ -30,6 +30,13 @@ public class UIManager : MonoBehaviour
 
         spawnButton.onClick.AddListener(() =>
         {
+            // Instance only exists on a client; a server-only session has no local player to spawn.
+            if (NetworkPlayer.Instance == null)
+            {
+                Debug.LogWarning("Cannot spawn a pawn without a local player. Start as host or join as client first.");
+                return;
+            }
+
             NetworkPlayer.Instance.SpawnPawn();
         });
     }

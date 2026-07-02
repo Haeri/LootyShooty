@@ -8,7 +8,10 @@ using Random = UnityEngine.Random;
 
 public class ViewController : NetworkBehaviour
 {
-    public Vector2 mouseSensitivity = new Vector2(30.0f, 30.0f);
+    /* Degrees per raw mouse-delta unit. Mouse deltas are already per-frame,
+     * so they must NOT be scaled by Time.deltaTime - doing so makes aim
+     * speed depend on framerate. */
+    public Vector2 mouseSensitivity = new Vector2(0.2f, 0.2f);
 
     public Vector3 gunSway = new Vector3(0.5f, 0.4f, 0.7f);
     public float recoverSpeed = 5.0f;
@@ -18,6 +21,7 @@ public class ViewController : NetworkBehaviour
     //private Transform playerTransform;
     [SerializeField] private GameObject _cameraObject;
     [SerializeField] private GameObject _cameraRoot;
+    [SerializeField] private Transform _gunHolder;
 
     private float xRotation = 0.0f;
     private InputMaster inputMaster;
@@ -39,17 +43,15 @@ public class ViewController : NetworkBehaviour
     public readonly SyncVar<bool> isAds = new(false);
     public readonly SyncVar<int> sightIndex = new(0);
 
-
-
-
-    private FishController _characterController;
-
-
-
+    /// <summary>Current camera pitch in degrees; sent to the server with movement input.</summary>
+    public float Pitch => xRotation;
 
     private void Awake()
     {
-        holderTransform = transform.GetChild(0);
+        /* The sway/recover system must target the gun holder, never the
+         * camera root - recovering the camera toward its rest rotation
+         * fights the look input and vibrates the view. */
+        holderTransform = _gunHolder != null ? _gunHolder : transform.GetChild(0);
         holderPosition = holderTransform.localPosition;
         holderRotation = holderTransform.localRotation;
 
@@ -58,8 +60,6 @@ public class ViewController : NetworkBehaviour
 
         volume = _cameraObject.GetComponent<Volume>();
         volume.profile.TryGet(out dofEffect);
-
-        _characterController = GetComponent<FishController>();
     }
 
     public override void OnStartClient()
@@ -69,7 +69,8 @@ public class ViewController : NetworkBehaviour
         if (IsOwner)
         {
             inputMaster = new InputMaster();
-            inputMaster.Player.Look.performed += ctx => lookInput = ctx.ReadValue<Vector2>();
+            // Deltas accumulate here and are consumed (zeroed) each frame in Update.
+            inputMaster.Player.Look.performed += ctx => lookInput += ctx.ReadValue<Vector2>();
             inputMaster.Player.MouseLock.performed += ctx => ToggleMouseLock();
             inputMaster.Enable();
 
@@ -79,16 +80,33 @@ public class ViewController : NetworkBehaviour
         //playerTransform = transform.parent.GetComponent<Transform>();
     }
 
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+
+        // Ownership is gone by now, so OnDisable's IsOwner guard won't clean this up.
+        if (inputMaster != null)
+        {
+            inputMaster.Disable();
+            inputMaster.Dispose();
+            inputMaster = null;
+        }
+    }
+
     void Update()
     {
         float mouseX = 0;
         float mouseY = 0;
 
-       
+        // Consume the accumulated look delta even when unlocked so it cannot
+        // build up and yank the view when the cursor is re-locked.
+        Vector2 look = lookInput;
+        lookInput = Vector2.zero;
+
         if (IsOwner && Cursor.lockState == CursorLockMode.Locked)
         {
-            mouseX = lookInput.x * mouseSensitivity.x * Time.deltaTime + _recoil.x;
-            mouseY = lookInput.y * mouseSensitivity.y * Time.deltaTime + _recoil.y;
+            mouseX = look.x * mouseSensitivity.x + _recoil.x;
+            mouseY = look.y * mouseSensitivity.y + _recoil.y;
 
             _recoil = Vector2.zero;
 
@@ -96,8 +114,11 @@ public class ViewController : NetworkBehaviour
             xRotation = Mathf.Clamp(xRotation, -90.0f, 90.0f);
 
             _cameraRoot.transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
-            //playerTransform.Rotate(Vector3.up * mouseX);
-            _characterController.Rotate(mouseX);
+            /* Yaw is applied directly for instant response. The resulting
+             * absolute angle is sent to the server with the movement input,
+             * so the server stays authoritative over position while the
+             * client owns its aim. */
+            transform.Rotate(Vector3.up * mouseX);
         }
 
         if (_recoilReverse != Vector2.zero)

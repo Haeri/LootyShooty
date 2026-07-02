@@ -541,7 +541,7 @@ public class DebugGUI : MonoBehaviour
     // Populate attributes
     void RegisterAttributes()
     {
-        MonoBehaviour[] sceneObjects = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
+        MonoBehaviour[] sceneObjects = FindObjectsByType<MonoBehaviour>();
         HashSet<MonoBehaviour> uniqueAttributeContainers = new HashSet<MonoBehaviour>();
 
         foreach (MonoBehaviour mb in sceneObjects)
