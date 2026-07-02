@@ -25,11 +25,11 @@ jobs:
             uploadPath: build/LootyShooty-OSX.zip
           - targetPlatform: StandaloneLinux64
             artifactName: LootyShooty-Linux64
-            os: ubuntu-latest
+            os: ubuntu-22.04
             uploadPath: build/LootyShooty-Linux64
           - targetPlatform: StandaloneLinux64
             artifactName: LootyShooty-Server-Linux64
-            os: ubuntu-latest
+            os: ubuntu-22.04
             uploadPath: build/LootyShooty-Server-Linux64
             extraArgs: -standaloneBuildSubtarget Server
             modules: linux-server
