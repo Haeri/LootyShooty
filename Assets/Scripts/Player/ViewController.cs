@@ -4,7 +4,6 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using Random = UnityEngine.Random;
 
 public class ViewController : NetworkBehaviour
 {
@@ -45,6 +44,7 @@ public class ViewController : NetworkBehaviour
 
     /// <summary>Current camera pitch in degrees; sent to the server with movement input.</summary>
     public float Pitch => xRotation;
+    public float RecoilVariance => variance;
 
     private void Awake()
     {
@@ -228,10 +228,9 @@ public class ViewController : NetworkBehaviour
         _gun = gun;
     }
 
-    public void AddRecoid(Vector2 direction)
+    public void AddRecoil(Vector2 direction, Vector2 deterministicJitter)
     {
-        Vector2 rand = Random.insideUnitCircle.normalized * variance;
-        direction += rand;
+        direction += deterministicJitter;
         _recoil += direction;
         _recoilReverse -= direction;
     }

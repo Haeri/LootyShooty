@@ -1,7 +1,8 @@
-﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using FishNet.Connection;
 using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using FishNet.Component.Transforming;
 
 [RequireComponent(typeof(AudioSource))]
@@ -20,6 +21,8 @@ public class Gun : NetworkBehaviour
     public Vector2 mouseRecoil;
 
     public float kickbackRandomScalar;
+    [Tooltip("Maximum deterministic projectile deviation in degrees.")]
+    public float spreadAngle;
 
     public float muzzleVelocity;
     public float fireRate = 1;
@@ -38,16 +41,47 @@ public class Gun : NetworkBehaviour
 
     public Vector3 reloadThrowDirection;
 
+    /// <summary>Unique runtime identity and deterministic random state for this gun.</summary>
+    public int GunId => ObjectId;
+    public uint WeaponSeed => weaponSeed.Value;
+    public uint ShotsFired => shotsFired.Value;
+
+    public readonly SyncVar<uint> weaponSeed = new(0u);
+    public readonly SyncVar<uint> shotsFired = new(0u);
+
     private float lastFire;
     private bool timeToFire;
     private bool isReloading;
     private float reloadProgress = 0;
     private Vector3 magStore = new Vector3(-0.1f, -0.3f, -0.2f);
+    private uint _predictedShotsFired;
+    private readonly HashSet<uint> _predictedSequences = new();
 
 
     void Start()
     {
         _audioSource = GetComponent<AudioSource>();
+    }
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        weaponSeed.Value = DeterministicWeaponRandom.CreateWeaponSeed(unchecked((uint)ObjectId));
+        shotsFired.Value = 0u;
+        _predictedShotsFired = 0u;
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        _predictedShotsFired = shotsFired.Value;
+    }
+
+    public override void OnOwnershipClient(NetworkConnection previousOwner)
+    {
+        base.OnOwnershipClient(previousOwner);
+        _predictedShotsFired = shotsFired.Value;
+        _predictedSequences.Clear();
     }
 
     void Update()
@@ -96,91 +130,166 @@ public class Gun : NetworkBehaviour
 
     public void Shoot()
     {
-        // Perform action on server
-        ShootServerRpc(0);
-
-        // Dont perform action on the host, as Host is also server
-        if (!IsServerInitialized)
+        if (bullets <= 0)
         {
-            // Perform action locally
-            if (bullets > 0)
-            {
-                if (timeToFire && !isReloading)
-                {
-                    ShootAction(false);
-
-                    --bullets;
-                    timeToFire = false;
-                }
-            }
-            else
-            {
-                ReloadAction(false);
-            }
+            Reload();
+            return;
         }
+
+        if (!timeToFire || isReloading)
+            return;
+
+        // A host performs the authoritative action directly. A remote owner
+        // predicts with the same seed/sequence that the server will validate.
+        if (IsServerInitialized)
+        {
+            TryShootServer(shotsFired.Value);
+            return;
+        }
+
+        uint sequence = _predictedShotsFired++;
+        uint seed = weaponSeed.Value;
+        _predictedSequences.Add(sequence);
+
+        ShootAction(false, seed, sequence);
+        --bullets;
+        timeToFire = false;
+        ShootServerRpc(sequence);
     }
 
-    private void ShootAction(bool isRealAction)
+    private void ShootAction(bool isRealAction, uint seed, uint sequence)
     {
         //Debug.Log("Shoot " + (blank ? "fake" : "real") + " bullets");
         _audioSource.PlayOneShot(_audioSource.clip);
 
-        GameObject b = ObjectPool.Instance.instanciate(bullet);
-        b.transform.position = muzzle.position;
-        b.transform.rotation = muzzle.rotation;
+        // Activate pooled trails at the muzzle. Activating at world origin and
+        // teleporting afterward draws a fake tracer line to (0,0,0).
+        GameObject b = ObjectPool.Instance.instanciate(bullet, muzzle.position, muzzle.rotation);
         b.GetComponent<Projectile>().blank = !isRealAction;
 
         // Resolve the wielder by searching upward; hardcoded parent chains
         // break whenever the holder hierarchy changes.
         FishController wielder = GetComponentInParent<FishController>();
-        if (wielder != null)
-        {
-            b.GetComponent<Projectile>().shooter = wielder.gameObject;
-        }
+        // Also disables collision between the bullet and the wielder so
+        // players cannot run into (and kill themselves with) their own shots.
+        b.GetComponent<Projectile>().SetShooter(wielder != null ? wielder.gameObject : null);
 
-        b.GetComponent<Rigidbody>().linearVelocity = transform.forward * muzzleVelocity;
+        Vector2 spread = DeterministicWeaponRandom.InsideUnitCircle(
+            seed, sequence, DeterministicWeaponRandom.SpreadStream) * spreadAngle;
+        Vector3 shotDirection = muzzle.rotation * Quaternion.Euler(-spread.y, spread.x, 0f) * Vector3.forward;
+        b.GetComponent<Rigidbody>().linearVelocity = shotDirection * muzzleVelocity;
 
         if (transform.parent != null)
         {
-            transform.parent.localPosition += kickback;
-            //transform.parent.localPosition += Util.vec3FromRandomAngle(kickback * 0.001f, kickbackRandomScalar);
+            Vector2 kickbackJitter = DeterministicWeaponRandom.InsideUnitCircle(
+                seed, sequence, DeterministicWeaponRandom.KickbackStream) * kickbackRandomScalar;
+            transform.parent.localPosition += kickback + new Vector3(kickbackJitter.x, kickbackJitter.y, 0f);
             transform.parent.localRotation = Quaternion.Euler(recoil) * transform.parent.localRotation;
 
             ViewController view = GetComponentInParent<ViewController>();
-            if (view != null)
-                view.AddRecoid(mouseRecoil);
+            if (view != null && view.IsOwner)
+            {
+                Vector2 recoilJitter = DeterministicWeaponRandom.InsideUnitCircle(
+                    seed, sequence, DeterministicWeaponRandom.CameraRecoilStream) * view.RecoilVariance;
+                view.AddRecoil(mouseRecoil, recoilJitter);
+            }
         }
     }
 
     [ServerRpc]
-    private void ShootServerRpc(ulong shooter)
+    private void ShootServerRpc(uint requestedSequence)
+    {
+        TryShootServer(requestedSequence);
+    }
+
+    private void TryShootServer(uint requestedSequence)
     {
         if (bullets > 0)
         {
             if (timeToFire && !isReloading)
             {
-                ShootAction(true);                
-                ShootClientRpc(shooter);
+                uint sequence = shotsFired.Value;
+                uint seed = weaponSeed.Value;
+
+                ShootAction(true, seed, sequence);
 
                 --bullets;
                 timeToFire = false;
+                shotsFired.Value = sequence + 1u;
+
+                ShootClientRpc(seed, sequence, bullets);
+                ConfirmShotTargetRpc(Owner, requestedSequence, true, seed, sequence, sequence + 1u, bullets);
+                return;
             }
         }
         else
         {
-            ReloadServerRPC(shooter);
+            ReloadServerRPC(0);
         }
+
+        ConfirmShotTargetRpc(
+            Owner,
+            requestedSequence,
+            false,
+            weaponSeed.Value,
+            shotsFired.Value,
+            shotsFired.Value,
+            bullets);
     }
 
     [ObserversRpc(ExcludeOwner = true)]
-    private void ShootClientRpc(ulong shooter)
+    private void ShootClientRpc(uint seed, uint sequence, int remainingBullets)
     {
-        // Replicate shooting on all clients except for the original one
-        //if (shooter != NetworkManager.LocalClientId)
-        {   
-            ShootAction(false);
+        // The host already performed the action in the server world.
+        if (IsServerInitialized)
+            return;
+
+        bullets = remainingBullets;
+        _predictedShotsFired = sequence + 1u;
+        ShootAction(false, seed, sequence);
+    }
+
+    [TargetRpc]
+    private void ConfirmShotTargetRpc(
+        NetworkConnection connection,
+        uint requestedSequence,
+        bool accepted,
+        uint seed,
+        uint authoritativeSequence,
+        uint nextSequence,
+        int remainingBullets)
+    {
+        if (IsServerInitialized)
+            return;
+
+        bool wasAcceptedPrediction = accepted &&
+                                     requestedSequence == authoritativeSequence &&
+                                     _predictedSequences.Remove(requestedSequence);
+
+        if (wasAcceptedPrediction)
+        {
+            // Several automatic-fire requests may be in flight. Never roll the
+            // local prediction counter or ammo back when acknowledging an older shot.
+            if (IsSequenceNewer(nextSequence, _predictedShotsFired))
+                _predictedShotsFired = nextSequence;
+        }
+        else
+        {
+            bullets = remainingBullets;
+            _predictedShotsFired = nextSequence;
+            _predictedSequences.Clear();
+        }
+
+        if (!wasAcceptedPrediction)
+        {
+            Debug.LogWarning(
+                $"Gun {GunId} shot prediction resynced. Requested {requestedSequence}, " +
+                $"server sequence {authoritativeSequence}, seed {seed}.");
         }
     }
+
+    private static bool IsSequenceNewer(uint candidate, uint current) =>
+        unchecked((int)(candidate - current)) > 0;
 
     public void Reload()
     {

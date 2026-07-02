@@ -1,9 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
-using System;
 
 public class Damagable : NetworkBehaviour
 {

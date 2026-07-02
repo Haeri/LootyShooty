@@ -1,8 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using FishNet.Object;
-using System.Collections.Generic;
-using System.Text;
 using FishNet;
 
 public class ConnectionManager : MonoBehaviour

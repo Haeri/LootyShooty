@@ -2705,11 +2705,15 @@ MonoBehaviour:
   mass: 4
   maxJumpCount: 2
   maxPickupDistance: 5
+  respawnDelay: 10
+  animMultiplier: 1
   hitConfirmSound: {fileID: 8300000, guid: 552bf5864ae481c4e860198cc26b619c, type: 3}
+  headBoneName: mixamorig:Head
+  headWeightThreshold: 0.4
   _cameraObject: {fileID: 1833894616450934722}
   _cameraRoot: {fileID: 4937619769058388379}
   _gunHolder: {fileID: 4937619768197937070}
-  _graphics: {fileID: 1756531788443174782}
+  _graphics: {fileID: 8773802286929495176}
   _leftHandIk: {fileID: 4417194019136730361}
   _rightHandIk: {fileID: 1934691105}
   _leftHandTarget: {fileID: 521657213758200175}
@@ -2763,7 +2767,7 @@ Transform:
   m_GameObject: {fileID: 4937619768197937070}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.201, y: -0.22, z: 0.199}
+  m_LocalPosition: {x: 0.201, y: -0.194, z: 0.199}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2796,7 +2800,7 @@ Transform:
   m_GameObject: {fileID: 4937619769058388379}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.497, z: 0}
+  m_LocalPosition: {x: 0, y: 1.448, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

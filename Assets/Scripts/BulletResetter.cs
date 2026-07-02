@@ -1,5 +1,3 @@
-﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class BulletResetter : IPoolInstanceResetter
@@ -9,5 +7,6 @@ public class BulletResetter : IPoolInstanceResetter
         GetComponent<Rigidbody>().linearVelocity = Vector3.zero;
         GetComponent<Rigidbody>().angularVelocity = Vector3.zero;
         GetComponent<TrailRenderer>().Clear();
+        GetComponent<Projectile>().ResetForPool();
     }
 }

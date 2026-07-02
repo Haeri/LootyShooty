@@ -2,7 +2,6 @@ using FishNet;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Prediction;
-using FishNet.Component.Transforming;
 using FishNet.Transporting;
 using System.Collections;
 using System.Collections.Generic;
@@ -89,6 +88,11 @@ public class FishController : NetworkBehaviour
     [Header("Feedback")]
     [SerializeField] private AudioClip hitConfirmSound;
 
+    [Header("First person")]
+    [SerializeField] private string headBoneName = "mixamorig:Head";
+    [Tooltip("Triangles whose vertices carry more head-bone weight than this are hidden for the local player. Lower removes more of the neck.")]
+    [SerializeField, Range(0f, 1f)] private float headWeightThreshold = 0.4f;
+
     [Header("References")]
     [SerializeField] private GameObject _cameraObject;
     [SerializeField] private GameObject _cameraRoot;    
@@ -107,7 +111,15 @@ public class FishController : NetworkBehaviour
     private Damagable _damagable;
     private Animator _animator;
     private AudioSource _feedbackAudioSource;
-    private Renderer[] _ownerRenderers;
+
+    private struct HeadlessSwap
+    {
+        public SkinnedMeshRenderer Renderer;
+        public Mesh Original;
+        public Mesh Headless;
+    }
+    private readonly List<HeadlessSwap> _headlessSwaps = new List<HeadlessSwap>();
+    private readonly List<Renderer> _headlessFallbacks = new List<Renderer>();
 
 
     private Text _itemText;
@@ -134,6 +146,7 @@ public class FishController : NetworkBehaviour
 
     private float _verticalVelocity = 0f;
     private int _jumpCount = 0;
+    private bool _isRagdollActive;
 
     private List<RagdollPart> _ragdoll_parts = new List<RagdollPart>();
 
@@ -146,26 +159,39 @@ public class FishController : NetworkBehaviour
         _damagable = GetComponent<Damagable>();
         _animator = GetComponentInChildren<Animator>();
         _feedbackAudioSource = GetComponent<AudioSource>();
-        // _ownerRenderers = _graphics.GetComponentsInChildren<Renderer>(true);
 
         _accelerationStrength = maxSpeed / accelerationTime;
         _decelerationStrength = -maxSpeed / decelerationTime;
         _airAccelerationStrength = maxSpeed / airAccelerationTime;
         _airDecelerationStrength = -maxSpeed / airDecelerationTime;
 
-        foreach (Collider c in _graphics.GetComponentsInChildren<Collider>())
+        if (_graphics == null)
         {
-            RagdollPart rp = new RagdollPart();
-            rp.collider = c;
-            rp.rigidbody = c.GetComponent<Rigidbody>();
-            rp.transform = c.transform;
-            rp.initialPos = c.transform.localPosition;
-            rp.initialRot = c.transform.localRotation;
-            rp.initialScale = c.transform.localScale;
-            _ragdoll_parts.Add(rp);
+            Debug.LogError($"{name} has no graphics root assigned; ragdoll setup was skipped.", this);
+        }
+        else
+        {
+            foreach (Rigidbody body in _graphics.GetComponentsInChildren<Rigidbody>(true))
+            {
+                Collider ragdollCollider = body.GetComponent<Collider>();
+                if (ragdollCollider == null)
+                {
+                    Debug.LogWarning($"Skipping ragdoll body '{body.name}' because it has no collider.", body);
+                    continue;
+                }
+
+                RagdollPart rp = new RagdollPart();
+                rp.collider = ragdollCollider;
+                rp.rigidbody = body;
+                rp.transform = body.transform;
+                rp.initialPos = body.transform.localPosition;
+                rp.initialRot = body.transform.localRotation;
+                rp.initialScale = body.transform.localScale;
+                _ragdoll_parts.Add(rp);
+            }
         }
 
-        toggleRagdoll(false);
+        SetRagdollActive(false);
         SetWeaponIk(null);
     }
 
@@ -237,7 +263,7 @@ public class FishController : NetworkBehaviour
             _inputMaster.Player.Take.performed += ctx => PckupItemServerRPC();
             _inputMaster.Enable();
 
-            SetOwnerGraphicsHidden(true);
+            SetFirstPersonBody(true);
 
             _itemTextPanel = UIManager.Instance.itemTextPanel;
             _itemText = _itemTextPanel.transform.GetChild(0).GetComponent<Text>();
@@ -258,7 +284,7 @@ public class FishController : NetworkBehaviour
             _inputMaster = null;
         }
 
-        SetOwnerGraphicsHidden(false);
+        ReleaseHeadlessSwaps();
     }
 
     private void TimeManager_OnTick()
@@ -445,7 +471,7 @@ public class FishController : NetworkBehaviour
          * the transform. */
         _characterController.enabled = false;
         transform.position = rd.Position;
-        _characterController.enabled = true;
+        _characterController.enabled = !_isRagdollActive;
     }
 
     /// <summary>Builds the authoritative movement snapshot required by FishNet prediction.</summary>
@@ -529,10 +555,7 @@ public class FishController : NetworkBehaviour
     {
         _gun.transform.parent = null;
         _gun.SetEquiped(false);
-        //if (IsServer)
-        {
-            _gun.GetComponent<Rigidbody>().AddForce(transform.forward * 150);
-        }
+        _gun.GetComponent<Rigidbody>().AddForce(transform.forward * 150);
 
         _gun = null;
         _viewController.EquipGun(null);
@@ -561,9 +584,7 @@ public class FishController : NetworkBehaviour
     [ObserversRpc(BufferLast = true)]
     private void DropItemClientRpc()
     {
-   
-            DropItemAction();
-        
+        DropItemAction();
     }
 
 
@@ -594,8 +615,7 @@ public class FishController : NetworkBehaviour
     [ServerRpc]
     private void PckupItemServerRPC()
     {
-        //Debug.Log(Owner);
-        // Check if there is anything infront
+        // Check if there is anything in front
         GameObject go = itemPickupCheck();
         if (go == null) return;
 
@@ -638,6 +658,7 @@ public class FishController : NetworkBehaviour
     private void Server_OnDeath()
     {
         ServerDropItem();
+        SetRagdollActive(true);
         SetDeadObserversRpc(true);
         StartCoroutine(Server_RespawnAfterDelay());
     }
@@ -646,28 +667,35 @@ public class FishController : NetworkBehaviour
     {
         yield return new WaitForSeconds(respawnDelay);
 
-        // Teleport server-side; clients follow through the reconcile.
-        _characterController.enabled = false;
+        // The controller is already disabled while dead. Teleport the root,
+        // then rebuild the animated pose before clients resume movement.
         transform.position = _spawnPosition;
-        _characterController.enabled = true;
         _velocity = Vector3.zero;
         _verticalVelocity = 0f;
         _jumpCount = 0;
 
         _damagable.ResetHealth();
+        SetRagdollActive(false);
         SetDeadObserversRpc(false);
     }
 
     [ObserversRpc(BufferLast = true)]
     private void SetDeadObserversRpc(bool dead)
     {
-        toggleRagdoll(dead);
+        // The server has already applied this state. On a host the client and
+        // server share the same object, so avoid resetting the ragdoll twice.
+        if (!IsServerInitialized)
+            SetRagdollActive(dead);
 
         if (IsOwner)
         {
             _viewController.enabled = !dead;
             if (dead)
                 _isShooting = false;
+
+            // Show the full body (head included) while the death ragdoll is
+            // visible; go headless again on respawn.
+            SetFirstPersonBody(!dead);
         }
     }
 
@@ -699,16 +727,62 @@ public class FishController : NetworkBehaviour
     #endregion
 
     #region First-person visuals and weapon IK.
-    private void SetOwnerGraphicsHidden(bool hidden)
+    /// <summary>
+    /// Toggles the local player's first-person body: headless meshes while
+    /// alive and controlling the camera, the full meshes (head included)
+    /// otherwise - e.g. while the death ragdoll is showing. Bones and
+    /// colliders are untouched, so hit detection and the ragdoll stay intact.
+    /// </summary>
+    private void SetFirstPersonBody(bool enabled)
     {
-        if (_ownerRenderers == null)
+        if (enabled && _headlessSwaps.Count == 0 && _headlessFallbacks.Count == 0)
+            BuildHeadlessSwaps();
+
+        foreach (HeadlessSwap swap in _headlessSwaps)
+        {
+            if (swap.Renderer != null)
+                swap.Renderer.sharedMesh = enabled ? swap.Headless : swap.Original;
+        }
+
+        // Renderers without a resolvable head bone are simply hidden instead.
+        foreach (Renderer fallback in _headlessFallbacks)
+        {
+            if (fallback != null)
+                fallback.forceRenderingOff = enabled;
+        }
+    }
+
+    private void BuildHeadlessSwaps()
+    {
+        if (_graphics == null)
             return;
 
-        foreach (Renderer characterRenderer in _ownerRenderers)
+        foreach (SkinnedMeshRenderer smr in _graphics.GetComponentsInChildren<SkinnedMeshRenderer>(true))
         {
-            if (characterRenderer != null)
-                characterRenderer.forceRenderingOff = hidden;
+            Mesh headless = HeadlessMeshBuilder.Build(smr, headBoneName, headWeightThreshold);
+            if (headless == null)
+            {
+                Debug.LogWarning($"Could not build headless mesh for '{smr.name}' (head bone '{headBoneName}' not found?); hiding it instead.", smr);
+                _headlessFallbacks.Add(smr);
+                continue;
+            }
+
+            _headlessSwaps.Add(new HeadlessSwap { Renderer = smr, Original = smr.sharedMesh, Headless = headless });
         }
+    }
+
+    private void ReleaseHeadlessSwaps()
+    {
+        SetFirstPersonBody(false);
+
+        foreach (HeadlessSwap swap in _headlessSwaps)
+        {
+            if (swap.Headless != null)
+                Destroy(swap.Headless);
+        }
+
+        _headlessSwaps.Clear();
+        _headlessFallbacks.Clear();
     }
 
     private void SetWeaponIk(Gun gun)
@@ -725,17 +799,24 @@ public class FishController : NetworkBehaviour
     }
     #endregion
 
-    private void toggleRagdoll(bool toggle)
+    private void SetRagdollActive(bool active)
     {
+        _isRagdollActive = active;
+
         // The animator must release the bones while ragdolling.
         if (_animator != null)
-            _animator.enabled = !toggle;
+            _animator.enabled = !active;
 
-        if (toggle)
+        if (_characterController != null)
+            _characterController.enabled = !active;
+
+        if (active)
         {
             foreach (RagdollPart rp in _ragdoll_parts)
             {
+                rp.collider.enabled = true;
                 rp.rigidbody.isKinematic = false;
+                rp.rigidbody.linearVelocity = _velocity + Vector3.up * _verticalVelocity;
             }
         }
         else
@@ -743,6 +824,8 @@ public class FishController : NetworkBehaviour
             foreach (RagdollPart rp in _ragdoll_parts)
             {
                 rp.rigidbody.isKinematic = true;
+                rp.rigidbody.linearVelocity = Vector3.zero;
+                rp.rigidbody.angularVelocity = Vector3.zero;
                 rp.transform.localPosition = rp.initialPos;
                 rp.transform.localRotation = rp.initialRot;
                 rp.transform.localScale = rp.initialScale;

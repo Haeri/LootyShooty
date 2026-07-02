@@ -1,6 +1,4 @@
-﻿using System.Collections;
 using System.Collections.Generic;
-using System.Data;
 using UnityEngine;
 
 public class ObjectPool : MonoBehaviour
@@ -57,9 +55,14 @@ public class ObjectPool : MonoBehaviour
 
     public GameObject instanciate(GameObject prefab)
     {
+        return instanciate(prefab, Vector3.zero, Quaternion.identity);
+    }
+
+    public GameObject instanciate(GameObject prefab, Vector3 position, Quaternion rotation)
+    {
         Ringbuffer rb = ringBufferMap[prefab];
         
-        GameObject obj = resetObject(rb.list[rb.currentIndex]);
+        GameObject obj = resetObject(rb.list[rb.currentIndex], position, rotation);
         rb.currentIndex = (rb.currentIndex + 1) % rb.list.Count;
         ringBufferMap[prefab] = rb;
 
@@ -68,11 +71,15 @@ public class ObjectPool : MonoBehaviour
 
     public GameObject resetObject(GameObject obj) 
     {
+        return resetObject(obj, Vector3.zero, Quaternion.identity);
+    }
+
+    public GameObject resetObject(GameObject obj, Vector3 position, Quaternion rotation)
+    {
         obj.SetActive(false);
-        obj.transform.position = Vector3.zero;
-        obj.transform.rotation = Quaternion.identity;
-        obj.transform.localScale = Vector3.one;
         obj.transform.SetParent(null);
+        obj.transform.SetPositionAndRotation(position, rotation);
+        obj.transform.localScale = Vector3.one;
 
         IPoolInstanceResetter pir = obj.GetComponent<IPoolInstanceResetter>();
         if(pir != null)

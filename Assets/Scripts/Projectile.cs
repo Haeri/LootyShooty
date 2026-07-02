@@ -1,5 +1,5 @@
+using System.Collections.Generic;
 using UnityEngine;
-using FishNet.Object;
 
 public class Projectile : MonoBehaviour
 {
@@ -13,9 +13,40 @@ public class Projectile : MonoBehaviour
     private int penetrationCount;
     private Vector3 lastVelocity;
     private Rigidbody rb;
+    private Collider projectileCollider;
+    private readonly List<Collider> ignoredColliders = new();
+
+    /// <summary>
+    /// Marks the firing pawn and disables collision against all of its
+    /// colliders so players can never run into their own bullets.
+    /// </summary>
+    public void SetShooter(GameObject shooterRoot)
+    {
+        shooter = shooterRoot;
+        if (shooterRoot == null)
+            return;
+
+        foreach (Collider shooterCollider in shooterRoot.GetComponentsInChildren<Collider>(true))
+        {
+            Physics.IgnoreCollision(projectileCollider, shooterCollider, true);
+            if (!ignoredColliders.Contains(shooterCollider))
+                ignoredColliders.Add(shooterCollider);
+        }
+    }
 
     private void OnCollisionEnter(Collision collision)
     {
+        /* Safety net: IgnoreCollision pairs are silently cleared whenever a
+         * collider is toggled (the CharacterController is, every reconcile).
+         * Re-ignore and bail instead of damaging the shooter. */
+        if (shooter != null && collision.transform.IsChildOf(shooter.transform))
+        {
+            Physics.IgnoreCollision(projectileCollider, collision.collider, true);
+            if (!ignoredColliders.Contains(collision.collider))
+                ignoredColliders.Add(collision.collider);
+            return;
+        }
+
         Damagable dmg = collision.gameObject.GetComponent<Damagable>();
         float multiplier = 1;
         if (dmg == null)
@@ -44,9 +75,10 @@ public class Projectile : MonoBehaviour
             // Display hit FX
             if (dmg.hitEffect != null)
             {
-                GameObject effect = ObjectPool.Instance.instanciate(dmg.hitEffect);
-                effect.transform.localPosition = collision.contacts[0].point;
-                effect.transform.localRotation = Quaternion.LookRotation(collision.contacts[0].normal);
+                ObjectPool.Instance.instanciate(
+                    dmg.hitEffect,
+                    collision.contacts[0].point,
+                    Quaternion.LookRotation(collision.contacts[0].normal));
                 //effect.transform.SetParent(collision.transform);
             }
         }
@@ -59,7 +91,9 @@ public class Projectile : MonoBehaviour
         if (dmg != null && dmg.isPenetrable && penetrationCount < maxPenetration)
         {
             //Debug.Log("Penetrate");
-            Physics.IgnoreCollision(GetComponent<Collider>(), collision.collider);
+            Physics.IgnoreCollision(projectileCollider, collision.collider);
+            if (!ignoredColliders.Contains(collision.collider))
+                ignoredColliders.Add(collision.collider);
             rb.linearVelocity = rb.linearVelocity * 0.8f;
             penetrationCount++;
         }
@@ -81,9 +115,10 @@ public class Projectile : MonoBehaviour
             gameObject.SetActive(false);
             //ObjectPool.Instance.resetObject(gameObject);
 
-            GameObject hole = ObjectPool.Instance.instanciate(bulletHole);
-            hole.transform.localPosition = (collision.contacts[0].point + norm * 0.01f);
-            hole.transform.localRotation = Quaternion.LookRotation(collision.contacts[0].normal);
+            ObjectPool.Instance.instanciate(
+                bulletHole,
+                collision.contacts[0].point + norm * 0.01f,
+                Quaternion.LookRotation(collision.contacts[0].normal));
             //hole.transform.SetParent(collision.transform);
         }
     }
@@ -91,6 +126,25 @@ public class Projectile : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        projectileCollider = GetComponent<Collider>();
+    }
+
+    public void ResetForPool()
+    {
+        if (projectileCollider == null)
+            projectileCollider = GetComponent<Collider>();
+
+        foreach (Collider ignoredCollider in ignoredColliders)
+        {
+            if (ignoredCollider != null)
+                Physics.IgnoreCollision(projectileCollider, ignoredCollider, false);
+        }
+
+        ignoredColliders.Clear();
+        penetrationCount = 0;
+        lastVelocity = Vector3.zero;
+        blank = true;
+        shooter = null;
     }
 
     void FixedUpdate()
